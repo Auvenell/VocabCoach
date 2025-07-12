@@ -58,18 +58,11 @@ struct WordClassifier {
         tagger.string = cleanWord
         
         var result = false
-        var foundTag: NLTag?
         tagger.enumerateTags(in: cleanWord.startIndex..<cleanWord.endIndex, unit: .word, scheme: .lexicalClass) { tag, tokenRange in
             if let tag = tag {
-                foundTag = tag
                 result = importantWordTypes.contains(tag)
-                print("🎯 WORD CLASSIFICATION: '\(cleanWord)' -> \(tag) -> Important: \(result)")
             }
             return false // Stop after first word
-        }
-        
-        if foundTag == nil {
-            print("🎯 WORD CLASSIFICATION: '\(cleanWord)' -> No tag found -> Important: \(result)")
         }
         
         return result
@@ -211,11 +204,7 @@ struct ReadingSession {
     }
     
     var isCompleted: Bool {
-        let completed = currentWordIndex >= totalWords
-        if completed {
-            print("🎯 SESSION COMPLETED - currentWordIndex: \(currentWordIndex), totalWords: \(totalWords)")
-        }
-        return completed
+        return currentWordIndex >= totalWords
     }
     
     var currentWord: String? {
@@ -225,19 +214,16 @@ struct ReadingSession {
     
     // Get list of important words that were ever pronounced incorrectly
     var wordsToReview: [String] {
-        let reviewWords = Array(incorrectImportantWordsSet).sorted()
-        print("🎯 WORDS TO REVIEW - Found \(reviewWords.count) words that were ever incorrect: \(reviewWords)")
-        return reviewWords
+        return Array(incorrectImportantWordsSet).sorted()
     }
     
     // Find the beginning of the current sentence
     func findSentenceStart() -> Int {
-        guard currentWordIndex < paragraph.words.count else { 
-            return 0 
-        }
+        // If completed, start from the last sentence
+        let searchIndex = min(currentWordIndex, paragraph.words.count - 1)
         
         // Look backwards from current word to find the last sentence-ending punctuation
-        for i in (0..<currentWordIndex).reversed() {
+        for i in (0..<searchIndex).reversed() {
             let word = paragraph.words[i]
             // Check if this word ends with sentence-ending punctuation
             if word.hasSuffix(".") || word.hasSuffix("!") || word.hasSuffix("?") {
@@ -251,18 +237,10 @@ struct ReadingSession {
     
     // Reset to beginning of current sentence
     mutating func resetToSentenceStart() {
-        print("🎯 RESET - Starting from word index: \(currentWordIndex)")
-        print("🎯 RESET - Current word: '\(paragraph.words[currentWordIndex])'")
-        
         let sentenceStart = findSentenceStart()
-        print("🎯 RESET - Calculated sentence start index: \(sentenceStart)")
-        print("🎯 RESET - Sentence start word: '\(paragraph.words[sentenceStart])'")
         
         currentWordIndex = sentenceStart
         currentWordAttempts = 0 // Reset attempts for the new word
-        
-        print("🎯 RESET - New current word index: \(currentWordIndex)")
-        print("🎯 RESET - New current word: '\(paragraph.words[currentWordIndex])'")
         
         // Reset word analyses for words from sentence start onwards
         for i in sentenceStart..<wordAnalyses.count {

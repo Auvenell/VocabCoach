@@ -1,5 +1,4 @@
 import SwiftUI
-import NaturalLanguage
 
 struct PracticeView: View {
     @StateObject private var speechManager = SpeechRecognitionManager()
@@ -136,18 +135,19 @@ struct PracticeView: View {
                 }
                 .accessibilityLabel(speechManager.isListening ? "Stop Listening" : "Start Reading")
                 
-                // Reset to sentence start button
+                // Reset button - changes behavior based on completion state
                 Button(action: {
-                    print("🎯 RESET BUTTON PRESSED!")
-                    print("🎯 RESET - About to call resetToSentenceStart()")
-                    resetToSentenceStart()
-                    print("🎯 RESET - Finished calling resetToSentenceStart()")
+                    if session.isCompleted {
+                        resetSession()
+                    } else {
+                        resetToSentenceStart()
+                    }
                 }) {
                     HStack(spacing: 8) {
-                        Image(systemName: "arrow.clockwise")
+                        Image(systemName: session.isCompleted ? "arrow.counterclockwise" : "arrow.clockwise")
                             .font(.system(size: 16))
                             .foregroundColor(.blue)
-                        Text("Start from beginning of sentence")
+                        Text(session.isCompleted ? "Start Over" : "Start from beginning of sentence")
                             .font(.subheadline)
                             .foregroundColor(.blue)
                     }
@@ -156,10 +156,6 @@ struct PracticeView: View {
                     .background(Color.blue.opacity(0.1))
                     .cornerRadius(8)
                 }
-                .onTapGesture {
-                    print("🔴 TAP GESTURE DETECTED!")
-                }
-                .allowsHitTesting(true)
             }
             .padding(.top, 16)
             
@@ -313,10 +309,10 @@ struct PracticeView: View {
                 }
             }
         } else if session.isCompleted {
-            // All words completed
+            // All words completed - stop listening automatically
+            speechManager.stopListening()
+            
             let reviewWords = session.wordsToReview
-            print("🎯 COMPLETION - Total words: \(session.totalWords), Correct: \(session.correctWords)")
-            print("🎯 COMPLETION - Words to review: \(reviewWords.count)")
             
             if reviewWords.isEmpty {
                 feedbackMessage = "Excellent! You've completed the paragraph perfectly!"
@@ -336,17 +332,30 @@ struct PracticeView: View {
     
     private func resetSession() {
         guard let paragraph = currentSession?.paragraph else { return }
+        
+        // Stop listening and clear speech recognition
+        speechManager.stopListening()
+        speechManager.clearTranscription()
+        
+        // Stop any ongoing text-to-speech
+        ttsManager.stopSpeaking()
+        
+        // Clear feedback message
+        feedbackMessage = ""
+        
+        // Start a completely fresh session
         startNewSession(with: paragraph)
+        
+        // Provide feedback about the reset
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            ttsManager.speakFeedback("Starting over. Begin reading the paragraph aloud.")
+        }
     }
     
     private func resetToSentenceStart() {
-        print("🎯 RESET METHOD CALLED!")
         guard var session = currentSession else { 
-            print("No current session")
             return 
         }
-        
-        print("Resetting to sentence start. Current word index: \(session.currentWordIndex)")
         
         // Stop listening temporarily to clear any buffered audio
         let wasListening = speechManager.isListening
@@ -356,8 +365,6 @@ struct PracticeView: View {
         
         session.resetToSentenceStart()
         currentSession = session
-        
-        print("New word index: \(session.currentWordIndex)")
         
         // Clear transcription completely
         speechManager.clearTranscription()
@@ -377,28 +384,7 @@ struct PracticeView: View {
         }
     }
     
-    private func isImportantWord(_ word: String) -> Bool {
-        // Remove punctuation for classification
-        let cleanWord = word.trimmingCharacters(in: .punctuationCharacters)
-        
-        // If the word is just punctuation, it's not important
-        if cleanWord.isEmpty {
-            return false
-        }
-        
-        let tagger = NLTagger(tagSchemes: [.lexicalClass])
-        tagger.string = cleanWord
-        
-        var result = false
-        tagger.enumerateTags(in: cleanWord.startIndex..<cleanWord.endIndex, unit: .word, scheme: .lexicalClass) { tag, tokenRange in
-            if let tag = tag {
-                result = [.noun, .verb, .adjective, .adverb].contains(tag)
-            }
-            return false // Stop after first word
-        }
-        
-        return result
-    }
+
 }
 
 struct ParagraphSelectorView: View {

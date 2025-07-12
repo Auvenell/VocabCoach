@@ -24,27 +24,21 @@ class SpeechRecognitionManager: NSObject, ObservableObject {
                 switch authStatus {
                 case .authorized:
                     self?.errorMessage = nil
-                    print("Speech recognition authorized")
                 case .denied:
                     self?.errorMessage = "Speech recognition permission denied"
-                    print("Speech recognition permission denied")
                 case .restricted:
                     self?.errorMessage = "Speech recognition restricted on this device"
-                    print("Speech recognition restricted on this device")
                 case .notDetermined:
                     self?.errorMessage = "Speech recognition not yet authorized"
-                    print("Speech recognition not yet authorized")
                 @unknown default:
                     self?.errorMessage = "Speech recognition authorization failed"
-                    print("Speech recognition authorization failed")
                 }
             }
         }
     }
     
     func startListening() {
-        guard !isListening else { print("Already listening"); return }
-        print("startListening called")
+        guard !isListening else { return }
         
         // Reset state
         transcribedText = ""
@@ -56,10 +50,8 @@ class SpeechRecognitionManager: NSObject, ObservableObject {
         do {
             try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-            print("Audio session configured and activated")
         } catch {
             errorMessage = "Failed to configure audio session: \(error.localizedDescription)"
-            print("Failed to configure audio session: \(error.localizedDescription)")
             return
         }
         
@@ -67,7 +59,6 @@ class SpeechRecognitionManager: NSObject, ObservableObject {
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let recognitionRequest = recognitionRequest else {
             errorMessage = "Unable to create speech recognition request"
-            print("Unable to create speech recognition request")
             return
         }
         recognitionRequest.shouldReportPartialResults = true
@@ -79,7 +70,6 @@ class SpeechRecognitionManager: NSObject, ObservableObject {
             if let error = error {
                 DispatchQueue.main.async {
                     self.errorMessage = "Recognition error: \(error.localizedDescription)"
-                    print("Recognition error: \(error.localizedDescription)")
                     self.stopListening()
                 }
                 return
@@ -89,7 +79,6 @@ class SpeechRecognitionManager: NSObject, ObservableObject {
                 DispatchQueue.main.async {
                     self.transcribedText = result.bestTranscription.formattedString
                     self.confidence = result.bestTranscription.segments.map { $0.confidence }.reduce(0, +) / Float(result.bestTranscription.segments.count)
-                    print("Transcribed: \(self.transcribedText) | Confidence: \(self.confidence)")
                 }
             }
         }
@@ -106,17 +95,14 @@ class SpeechRecognitionManager: NSObject, ObservableObject {
             audioEngine.prepare()
             try audioEngine.start()
             isListening = true
-            print("Audio engine started, now listening...")
         } catch {
             errorMessage = "Failed to start audio engine: \(error.localizedDescription)"
-            print("Failed to start audio engine: \(error.localizedDescription)")
             return
         }
     }
     
     func stopListening() {
-        guard isListening else { print("Not currently listening"); return }
-        print("stopListening called")
+        guard isListening else { return }
         
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
@@ -124,7 +110,6 @@ class SpeechRecognitionManager: NSObject, ObservableObject {
         recognitionTask?.cancel()
         
         isListening = false
-        print("Stopped listening")
     }
     
     func reset() {
@@ -132,11 +117,9 @@ class SpeechRecognitionManager: NSObject, ObservableObject {
         transcribedText = ""
         confidence = 0.0
         errorMessage = nil
-        print("SpeechRecognitionManager reset")
     }
     
     func clearTranscription() {
         transcribedText = ""
-        print("Transcription cleared")
     }
 } 
