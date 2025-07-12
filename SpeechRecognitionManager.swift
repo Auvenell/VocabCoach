@@ -134,4 +134,9 @@ class SpeechRecognitionManager: NSObject, ObservableObject {
         errorMessage = nil
         print("SpeechRecognitionManager reset")
     }
+    
+    func clearTranscription() {
+        transcribedText = ""
+        print("Transcription cleared")
+    }
 } 

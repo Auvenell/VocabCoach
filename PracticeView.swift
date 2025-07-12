@@ -1,4 +1,5 @@
 import SwiftUI
+import NaturalLanguage
 
 struct PracticeView: View {
     @StateObject private var speechManager = SpeechRecognitionManager()
@@ -105,34 +106,62 @@ struct PracticeView: View {
                 confidence: speechManager.confidence
             )
             
-            // Start/Stop Reading button (prominent)
-            Button(action: {
-                if speechManager.isListening {
-                    stopPractice()
-                } else {
-                    startPractice()
+            // Control buttons
+            VStack(spacing: 12) {
+                // Start/Stop Reading button (prominent)
+                Button(action: {
+                    if speechManager.isListening {
+                        stopPractice()
+                    } else {
+                        startPractice()
+                    }
+                }) {
+                    HStack(spacing: 12) {
+                        Image(systemName: speechManager.isListening ? "waveform.circle.fill" : "play.circle.fill")
+                            .font(.system(size: 32))
+                            .foregroundColor(.white)
+                            .shadow(color: speechManager.isListening ? .blue.opacity(0.7) : .clear, radius: 10, x: 0, y: 0)
+                            .scaleEffect(speechManager.isListening ? 1.2 : 1.0)
+                            .animation(.easeInOut(duration: 0.2), value: speechManager.isListening)
+                        Text(speechManager.isListening ? "Stop" : "Start Reading")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(speechManager.isListening ? Color.red : Color.green)
+                    .cornerRadius(16)
+                    .shadow(color: speechManager.isListening ? .blue.opacity(0.5) : .clear, radius: 10, x: 0, y: 0)
                 }
-            }) {
-                HStack(spacing: 12) {
-                    Image(systemName: speechManager.isListening ? "waveform.circle.fill" : "play.circle.fill")
-                        .font(.system(size: 32))
-                        .foregroundColor(.white)
-                        .shadow(color: speechManager.isListening ? .blue.opacity(0.7) : .clear, radius: 10, x: 0, y: 0)
-                        .scaleEffect(speechManager.isListening ? 1.2 : 1.0)
-                        .animation(.easeInOut(duration: 0.2), value: speechManager.isListening)
-                    Text(speechManager.isListening ? "Stop" : "Start Reading")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
+                .accessibilityLabel(speechManager.isListening ? "Stop Listening" : "Start Reading")
+                
+                // Reset to sentence start button
+                Button(action: {
+                    print("🎯 RESET BUTTON PRESSED!")
+                    print("🎯 RESET - About to call resetToSentenceStart()")
+                    resetToSentenceStart()
+                    print("🎯 RESET - Finished calling resetToSentenceStart()")
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 16))
+                            .foregroundColor(.blue)
+                        Text("Start from beginning of sentence")
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(8)
                 }
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(speechManager.isListening ? Color.red : Color.green)
-                .cornerRadius(16)
-                .shadow(color: speechManager.isListening ? .blue.opacity(0.5) : .clear, radius: 10, x: 0, y: 0)
+                .onTapGesture {
+                    print("🔴 TAP GESTURE DETECTED!")
+                }
+                .allowsHitTesting(true)
             }
             .padding(.top, 16)
-            .accessibilityLabel(speechManager.isListening ? "Stop Listening" : "Start Reading")
             
             // Progress indicator
             if session.totalWords > 0 {
@@ -150,6 +179,49 @@ struct PracticeView: View {
                     ProgressView(value: session.accuracy)
                         .progressViewStyle(LinearProgressViewStyle())
                         .accentColor(session.accuracy > 0.8 ? .green : session.accuracy > 0.6 ? .orange : .red)
+                    
+                    // Current word indicator
+                    if let currentWord = session.currentWord {
+                        HStack {
+                            Text("Current word:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text(currentWord)
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(.blue)
+                            Spacer()
+                            Text("Word \(session.currentWordIndex + 1) of \(session.totalWords)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    } else if session.isCompleted {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("✅ Completed!")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.green)
+                                Spacer()
+                            }
+                            
+                            let reviewWords = session.wordsToReview
+                            if !reviewWords.isEmpty {
+                                Text("Words to practice:")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                ForEach(reviewWords, id: \.self) { word in
+                                    HStack {
+                                        Text("• \(word)")
+                                            .font(.caption)
+                                            .foregroundColor(.red)
+                                        Spacer()
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 .padding()
                 .background(Color(.systemGray6))
@@ -175,7 +247,11 @@ struct PracticeView: View {
         
         // Provide initial feedback
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            ttsManager.speakFeedback("Begin reading the paragraph aloud")
+            if let currentWord = session.currentWord {
+                ttsManager.speakFeedback("Start by saying: \(currentWord)")
+            } else {
+                ttsManager.speakFeedback("Begin reading the paragraph aloud")
+            }
         }
     }
     
@@ -208,20 +284,49 @@ struct PracticeView: View {
     private func updateSession(with transcription: String) {
         guard var session = currentSession else { return }
         
-        session.analyzeTranscription(transcription, confidence: speechManager.confidence)
+        // Check if we have high confidence speech recognition and sufficient transcription
+        let highConfidence = speechManager.confidence > 0.7 && transcription.count > 2
+        
+        let wordCompleted = session.analyzeTranscription(transcription, confidence: speechManager.confidence)
+        
         currentSession = session
         
-        // Provide real-time feedback for significant errors
-        let missingWords = session.wordAnalyses.filter { $0.isMissing }.count
-        let mispronouncedWords = session.wordAnalyses.filter { $0.isMispronounced }.count
+        // If a word was completed, clear the transcription for the next word
+        if wordCompleted {
+            speechManager.clearTranscription()
+        }
         
-        if missingWords > 0 || mispronouncedWords > 0 {
-            let totalErrors = missingWords + mispronouncedWords
-            if totalErrors == 1 {
-                feedbackMessage = "Try to pronounce that word more clearly"
-            } else if totalErrors <= 3 {
-                feedbackMessage = "Focus on pronouncing each word carefully"
+        // Provide feedback based on high confidence results
+        if let currentWord = session.currentWord, highConfidence {
+            let currentAnalysis = session.wordAnalyses.first { $0.expectedIndex == session.currentWordIndex }
+            
+            if let analysis = currentAnalysis {
+                if analysis.isCorrect {
+                    // Word was pronounced correctly - provide positive feedback
+                    feedbackMessage = "Great! Now say: \(session.currentWord ?? "")"
+                } else if analysis.isMispronounced {
+                    // Word was mispronounced - provide specific feedback
+                    feedbackMessage = "Try saying '\(currentWord)' more clearly"
+                } else if analysis.isMissing {
+                    // Word was missing - prompt user
+                    feedbackMessage = "Please say: \(currentWord)"
+                }
             }
+        } else if session.isCompleted {
+            // All words completed
+            let reviewWords = session.wordsToReview
+            print("🎯 COMPLETION - Total words: \(session.totalWords), Correct: \(session.correctWords)")
+            print("🎯 COMPLETION - Words to review: \(reviewWords.count)")
+            
+            if reviewWords.isEmpty {
+                feedbackMessage = "Excellent! You've completed the paragraph perfectly!"
+            } else {
+                let wordList = reviewWords.joined(separator: ", ")
+                feedbackMessage = "Great job! You completed the paragraph. Words to practice: \(wordList)"
+            }
+        } else if !highConfidence && !transcription.isEmpty {
+            // Clear feedback when confidence is low but there's some transcription
+            feedbackMessage = ""
         }
     }
     
@@ -232,6 +337,67 @@ struct PracticeView: View {
     private func resetSession() {
         guard let paragraph = currentSession?.paragraph else { return }
         startNewSession(with: paragraph)
+    }
+    
+    private func resetToSentenceStart() {
+        print("🎯 RESET METHOD CALLED!")
+        guard var session = currentSession else { 
+            print("No current session")
+            return 
+        }
+        
+        print("Resetting to sentence start. Current word index: \(session.currentWordIndex)")
+        
+        // Stop listening temporarily to clear any buffered audio
+        let wasListening = speechManager.isListening
+        if wasListening {
+            speechManager.stopListening()
+        }
+        
+        session.resetToSentenceStart()
+        currentSession = session
+        
+        print("New word index: \(session.currentWordIndex)")
+        
+        // Clear transcription completely
+        speechManager.clearTranscription()
+        
+        // Restart listening if it was on before
+        if wasListening {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                speechManager.startListening()
+            }
+        }
+        
+        // Provide feedback about the reset
+        if let currentWord = session.currentWord {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                ttsManager.speakFeedback("Starting from: \(currentWord)")
+            }
+        }
+    }
+    
+    private func isImportantWord(_ word: String) -> Bool {
+        // Remove punctuation for classification
+        let cleanWord = word.trimmingCharacters(in: .punctuationCharacters)
+        
+        // If the word is just punctuation, it's not important
+        if cleanWord.isEmpty {
+            return false
+        }
+        
+        let tagger = NLTagger(tagSchemes: [.lexicalClass])
+        tagger.string = cleanWord
+        
+        var result = false
+        tagger.enumerateTags(in: cleanWord.startIndex..<cleanWord.endIndex, unit: .word, scheme: .lexicalClass) { tag, tokenRange in
+            if let tag = tag {
+                result = [.noun, .verb, .adjective, .adverb].contains(tag)
+            }
+            return false // Stop after first word
+        }
+        
+        return result
     }
 }
 

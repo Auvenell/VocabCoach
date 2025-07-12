@@ -95,7 +95,12 @@ struct TappableTextView: View {
                     .font(.body)
                     .foregroundColor(textColor(for: analysis))
                     .background(backgroundColor(for: analysis))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(borderColor(for: analysis), lineWidth: analysis?.isCurrentWord == true ? 2 : 0)
+                    )
                     .cornerRadius(4)
+                    .padding(analysis?.isCurrentWord == true ? 2 : 0)
                     .onTapGesture { onWordTap(word) }
             }
         }
@@ -113,6 +118,8 @@ struct TappableTextView: View {
             return Color.red.opacity(0.3)
         } else if analysis.isMispronounced {
             return Color.orange.opacity(0.3)
+        } else if analysis.isCurrentWord {
+            return Color.blue.opacity(0.1)
         } else {
             return Color.clear
         }
@@ -124,8 +131,19 @@ struct TappableTextView: View {
             return .green
         } else if analysis.isMissing || analysis.isMispronounced {
             return .red
+        } else if analysis.isCurrentWord {
+            return .blue
         } else {
             return .primary
+        }
+    }
+    
+    private func borderColor(for analysis: WordAnalysis?) -> Color {
+        guard let analysis = analysis else { return Color.clear }
+        if analysis.isCurrentWord {
+            return .blue
+        } else {
+            return Color.clear
         }
     }
 }
@@ -140,13 +158,20 @@ struct TranscriptionView: View {
                 .font(.headline)
                 .foregroundColor(.primary)
 
-            Text(transcribedText.isEmpty ? "Start speaking..." : transcribedText)
-                .font(.body)
-                .foregroundColor(transcribedText.isEmpty ? .secondary : .primary)
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.systemGray6))
-                .cornerRadius(8)
+            VStack(spacing: 4) {
+                if transcribedText.isEmpty {
+                    Text("Start speaking...")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                } else {
+                    displayWordsView
+                }
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .center)
+            .background(Color(.systemGray6))
+            .cornerRadius(8)
 
             if !transcribedText.isEmpty {
                 HStack {
@@ -168,5 +193,27 @@ struct TranscriptionView: View {
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(radius: 2)
+    }
+    
+    private var displayWordsView: some View {
+        let words = transcribedText.components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+        
+        let displayWords = words.count <= 4 ? words : Array(words.suffix(4))
+        
+        return HStack(spacing: 8) {
+            ForEach(Array(displayWords.enumerated()), id: \.offset) { index, word in
+                let isLastWord = index == displayWords.count - 1
+                Text(word)
+                    .font(.title2)
+                    .fontWeight(isLastWord ? .bold : .regular)
+                    .foregroundColor(isLastWord ? .blue : .primary)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                    .background(isLastWord ? Color.blue.opacity(0.1) : Color.clear)
+                    .cornerRadius(6)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 }
