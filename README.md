@@ -1,4 +1,4 @@
-# VocabCoach - iOS Reading & Pronunciation Trainer
+# VocabCoach - Reading & Pronunciation Trainer
 
 VocabCoach is an iOS mobile app designed to help users improve their spoken English vocabulary and fluency through interactive reading practice with real-time pronunciation feedback.
 
