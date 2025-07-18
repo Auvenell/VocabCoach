@@ -101,8 +101,7 @@ struct PracticeView: View {
             
             // Transcription view
             TranscriptionView(
-                transcribedText: speechManager.transcribedText,
-                confidence: speechManager.confidence
+                transcribedText: speechManager.transcribedText
             )
             
             // Control buttons
@@ -280,10 +279,8 @@ struct PracticeView: View {
     private func updateSession(with transcription: String) {
         guard var session = currentSession else { return }
         
-        // Check if we have high confidence speech recognition and sufficient transcription
-        let highConfidence = speechManager.confidence > 0.7 && transcription.count > 2
         
-        let wordCompleted = session.analyzeTranscription(transcription, confidence: speechManager.confidence)
+        let wordCompleted = session.analyzeTranscription(transcription)
         
         currentSession = session
         
@@ -292,7 +289,6 @@ struct PracticeView: View {
             speechManager.clearTranscription()
         }
         
-        // Provide feedback based on high confidence results
         if let currentWord = session.currentWord {
             let currentAnalysis = session.wordAnalyses.first { $0.expectedIndex == session.currentWordIndex }
             

@@ -31,7 +31,6 @@ struct WordAnalysis {
     let word: String
     let expectedIndex: Int
     let isCorrect: Bool
-    let confidence: Float
     let userSpoken: String?
     let isMissing: Bool
     let isMispronounced: Bool
@@ -96,7 +95,6 @@ struct ReadingSession {
                 word: word,
                 expectedIndex: index,
                 isCorrect: false,
-                confidence: 0.0,
                 userSpoken: nil,
                 isMissing: false,
                 isMispronounced: false,
@@ -106,7 +104,7 @@ struct ReadingSession {
         }
     }
     
-    mutating func analyzeTranscription(_ transcription: String, confidence: Float) -> Bool {
+    mutating func analyzeTranscription(_ transcription: String) -> Bool {
         let spokenWords = transcription.components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }
             .map { $0.lowercased().trimmingCharacters(in: .punctuationCharacters) }
@@ -131,7 +129,6 @@ struct ReadingSession {
                 word: currentWord,
                 expectedIndex: currentWordIndex,
                 isCorrect: isCorrect,
-                confidence: confidence,
                 userSpoken: userSpoken,
                 isMissing: isMissing,
                 isMispronounced: isMispronounced,
@@ -174,7 +171,6 @@ struct ReadingSession {
                 word: currentAnalysis.word,
                 expectedIndex: currentAnalysis.expectedIndex,
                 isCorrect: currentAnalysis.isCorrect,
-                confidence: currentAnalysis.confidence,
                 userSpoken: currentAnalysis.userSpoken,
                 isMissing: currentAnalysis.isMissing,
                 isMispronounced: currentAnalysis.isMispronounced,
@@ -193,7 +189,6 @@ struct ReadingSession {
                 word: nextAnalysis.word,
                 expectedIndex: nextAnalysis.expectedIndex,
                 isCorrect: nextAnalysis.isCorrect,
-                confidence: nextAnalysis.confidence,
                 userSpoken: nextAnalysis.userSpoken,
                 isMissing: nextAnalysis.isMissing,
                 isMispronounced: nextAnalysis.isMispronounced,
@@ -249,7 +244,6 @@ struct ReadingSession {
                 word: word,
                 expectedIndex: i,
                 isCorrect: false,
-                confidence: 0.0,
                 userSpoken: nil,
                 isMissing: false,
                 isMispronounced: false,

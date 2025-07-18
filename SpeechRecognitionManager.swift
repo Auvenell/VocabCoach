@@ -5,7 +5,6 @@ import AVFoundation
 class SpeechRecognitionManager: NSObject, ObservableObject {
     @Published var isListening = false
     @Published var transcribedText = ""
-    @Published var confidence: Float = 0.0
     @Published var errorMessage: String?
     
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
@@ -42,7 +41,6 @@ class SpeechRecognitionManager: NSObject, ObservableObject {
         
         // Reset state
         transcribedText = ""
-        confidence = 0.0
         errorMessage = nil
         
         // Configure audio session
@@ -78,7 +76,6 @@ class SpeechRecognitionManager: NSObject, ObservableObject {
             if let result = result {
                 DispatchQueue.main.async {
                     self.transcribedText = result.bestTranscription.formattedString
-                    self.confidence = result.bestTranscription.segments.map { $0.confidence }.reduce(0, +) / Float(result.bestTranscription.segments.count)
                 }
             }
         }
@@ -115,7 +112,6 @@ class SpeechRecognitionManager: NSObject, ObservableObject {
     func reset() {
         stopListening()
         transcribedText = ""
-        confidence = 0.0
         errorMessage = nil
     }
     
