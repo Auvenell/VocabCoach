@@ -151,8 +151,8 @@ struct ReadingSession {
         // Increment attempts for current word
         currentWordAttempts += 1
         
-        // If this is the 3rd or more attempt on an important word, add to practice list
-        if currentWordAttempts >= 3 {
+        // If this is an important word that was mispronounced, add to practice list
+        if !isCorrect {
             let currentWord = paragraph.words[currentWordIndex]
             let isImportant = WordClassifier.isImportantWord(currentWord)
             if isImportant {
