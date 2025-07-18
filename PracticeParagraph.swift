@@ -41,7 +41,7 @@ struct WordAnalysis {
 // Word classification helper for completion summary
 struct WordClassifier {
     static let importantWordTypes: Set<NLTag> = [
-        .noun, .verb, .adjective, .adverb
+        .noun, .verb, .adjective, .adverb, .otherWord
     ]
     
     static func isImportantWord(_ word: String) -> Bool {
