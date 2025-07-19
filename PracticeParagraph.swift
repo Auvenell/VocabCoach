@@ -78,6 +78,7 @@ struct ReadingSession {
     var currentWordIndex: Int = 0
     var incorrectImportantWordsSet: Set<String> = [] // Track unique incorrect important words
     var currentWordAttempts: Int = 0 // Track attempts on current word
+    var currentWordStartTime: Date? // Track when we started on current word
     var accuracy: Double {
         guard totalWords > 0 else { return 0.0 }
         return Double(correctWords) / Double(totalWords)
@@ -115,7 +116,33 @@ struct ReadingSession {
         let expectedWord = paragraph.words[currentWordIndex].lowercased().trimmingCharacters(in: .punctuationCharacters)
         
         // Check if the expected word appears anywhere in the spoken words
-        let userSpoken = spokenWords.first { $0 == expectedWord }
+        // Use more flexible matching for unclear pronunciations
+        let userSpoken = spokenWords.first { spokenWord in
+            // Exact match
+            if spokenWord == expectedWord {
+                return true
+            }
+            
+            // Partial match (for unclear pronunciations)
+            if expectedWord.count > 3 && spokenWord.count > 2 {
+                // Check if the spoken word contains most of the expected word
+                let minLength = min(expectedWord.count, spokenWord.count)
+                let commonPrefix = String(zip(expectedWord, spokenWord).prefix { $0.0 == $0.1 }.map { $0.0 })
+                
+                // If we have a good prefix match (at least 70% of the shorter word)
+                if commonPrefix.count >= minLength * 7 / 10 {
+                    return true
+                }
+                
+                // Check for common mispronunciations or unclear speech
+                if expectedWord.hasPrefix(spokenWord) || spokenWord.hasPrefix(expectedWord) {
+                    return true
+                }
+            }
+            
+            return false
+        }
+        
         let isCorrect = userSpoken != nil
         let isMissing = spokenWords.isEmpty || !spokenWords.contains { $0 == expectedWord }
         let isMispronounced = !isMissing && !isCorrect
@@ -141,18 +168,31 @@ struct ReadingSession {
         if isCorrect {
             correctWords += 1
             currentWordAttempts = 0 // Reset attempts
+            currentWordStartTime = nil // Reset start time
             advanceToNextWord()
             return true // Indicate that the word was completed
+        }
+        
+        // Track when we started on this word if this is the first attempt
+        if currentWordAttempts == 0 {
+            currentWordStartTime = Date()
         }
         
         // Increment attempts for current word
         currentWordAttempts += 1
         
-        // If this is an important word that was mispronounced, add to practice list
+        // Only add to practice list if user is genuinely stuck (multiple attempts or significant time)
+        // This prevents adding words that are briefly misrecognized but then corrected
         if !isCorrect {
             let currentWord = paragraph.words[currentWordIndex]
             let isImportant = WordClassifier.isImportantWord(currentWord)
-            if isImportant {
+            
+            // Consider user stuck if they've made multiple attempts OR spent significant time
+            let isStuck = currentWordAttempts >= 2 || 
+                         (currentWordStartTime != nil && 
+                          Date().timeIntervalSince(currentWordStartTime!) > 5.0) // 5 seconds
+            
+            if isImportant && isStuck {
                 incorrectImportantWordsSet.insert(currentWord)
             }
         }
@@ -163,6 +203,7 @@ struct ReadingSession {
     private mutating func advanceToNextWord() {
         // Reset attempts for new word
         currentWordAttempts = 0
+        currentWordStartTime = nil // Reset start time for new word
         
         // Mark current word as no longer current
         if currentWordIndex < wordAnalyses.count {
