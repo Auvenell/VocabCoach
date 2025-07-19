@@ -92,7 +92,9 @@ struct ReadingSession {
     
     private mutating func initializeWordAnalyses() {
         wordAnalyses = paragraph.words.enumerated().map { index, word in
-            WordAnalysis(
+            let isImportant = WordClassifier.isImportantWord(word)
+
+            return WordAnalysis(
                 word: word,
                 expectedIndex: index,
                 isCorrect: false,
@@ -100,7 +102,7 @@ struct ReadingSession {
                 isMissing: false,
                 isMispronounced: false,
                 isCurrentWord: index == 0,
-                isImportantWord: WordClassifier.isImportantWord(word)
+                isImportantWord: isImportant
             )
         }
     }
@@ -180,7 +182,7 @@ struct ReadingSession {
         
         // Increment attempts for current word
         currentWordAttempts += 1
-        
+
         // Only add to practice list if user is genuinely stuck (multiple attempts or significant time)
         // This prevents adding words that are briefly misrecognized but then corrected
         if !isCorrect {
@@ -188,12 +190,12 @@ struct ReadingSession {
             let isImportant = WordClassifier.isImportantWord(currentWord)
             
             // Consider user stuck if they've made multiple attempts OR spent significant time
-            let isStuck = currentWordAttempts >= 2 || 
-                         (currentWordStartTime != nil && 
-                          Date().timeIntervalSince(currentWordStartTime!) > 5.0) // 5 seconds
+            let timeSpent = currentWordStartTime != nil ? Date().timeIntervalSince(currentWordStartTime!) : 0.0
+            let isStuck = currentWordAttempts >= 2 || timeSpent > 2.0 // 5 seconds
             
             if isImportant && isStuck {
                 incorrectImportantWordsSet.insert(currentWord)
+
             }
         }
         
@@ -250,7 +252,8 @@ struct ReadingSession {
     
     // Get list of important words that were ever pronounced incorrectly
     var wordsToReview: [String] {
-        return Array(incorrectImportantWordsSet).sorted()
+        let reviewWords = Array(incorrectImportantWordsSet).sorted()
+        return reviewWords
     }
     
     // Find the beginning of the current sentence
