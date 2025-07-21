@@ -130,25 +130,6 @@ struct ReadingSession {
                 return true
             }
             
-            // Partial match (for unclear pronunciations)
-            /*
-            if expectedWord.count > 3 && spokenWord.count > 2 {
-                // Check if the spoken word contains most of the expected word
-                let minLength = min(expectedWord.count, spokenWord.count)
-                let commonPrefix = String(zip(expectedWord, spokenWord).prefix { $0.0 == $0.1 }.map { $0.0 })
-                
-                // If we have a good prefix match (at least 80% of the shorter word)
-                if commonPrefix.count >= minLength * 8 / 10 {
-                    return true
-                }
-                
-                // Check for common mispronunciations or unclear speech
-                if expectedWord.hasPrefix(spokenWord) || spokenWord.hasPrefix(expectedWord) {
-                    return true
-                }
-            }
-            */
-            
             return false
         }
         
