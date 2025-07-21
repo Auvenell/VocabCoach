@@ -287,9 +287,11 @@ struct PracticeView: View {
         // If a word was completed, clear the transcription for the next word
         // Add a small delay to allow speech recognizer to provide final results
         if wordCompleted {
+            /*
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 speechManager.clearTranscription()
             }
+            */
         }
         
         if let currentWord = session.currentWord {

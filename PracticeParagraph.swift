@@ -46,7 +46,11 @@ struct WordClassifier {
     
     static func isImportantWord(_ word: String) -> Bool {
         // Remove punctuation for classification
-        let cleanWord = word.trimmingCharacters(in: .punctuationCharacters)
+        let cleanWord = word.trimmingCharacters(in: .punctuationCharacters).lowercased()
+        // Exception for articles 'a' and 'an', and function words 'is' and 'for'
+        if ["a", "an", "is", "for"].contains(cleanWord) {
+            return false
+        }
         
         // If the word is just punctuation, it's not important
         if cleanWord.isEmpty {
@@ -77,6 +81,7 @@ struct ReadingSession {
     var correctWords: Int = 0
     var currentWordIndex: Int = 0
     var incorrectImportantWordsSet: Set<String> = [] // Track unique incorrect important words
+    var incorrectImportantWordTimestamps: [String: Date] = [:] // Track when each word was added
     var currentWordAttempts: Int = 0 // Track attempts on current word
     var currentWordStartTime: Date? // Track when we started on current word
     var accuracy: Double {
@@ -126,13 +131,14 @@ struct ReadingSession {
             }
             
             // Partial match (for unclear pronunciations)
+            /*
             if expectedWord.count > 3 && spokenWord.count > 2 {
                 // Check if the spoken word contains most of the expected word
                 let minLength = min(expectedWord.count, spokenWord.count)
                 let commonPrefix = String(zip(expectedWord, spokenWord).prefix { $0.0 == $0.1 }.map { $0.0 })
                 
-                // If we have a good prefix match (at least 70% of the shorter word)
-                if commonPrefix.count >= minLength * 7 / 10 {
+                // If we have a good prefix match (at least 80% of the shorter word)
+                if commonPrefix.count >= minLength * 8 / 10 {
                     return true
                 }
                 
@@ -141,6 +147,7 @@ struct ReadingSession {
                     return true
                 }
             }
+            */
             
             return false
         }
@@ -166,8 +173,22 @@ struct ReadingSession {
             )
         }
         
+        let currentWord = paragraph.words[currentWordIndex]
+        let isImportant = WordClassifier.isImportantWord(currentWord)
+        let isFirstInSentence = isFirstWordOfSentence(currentWordIndex)
+        
         // If the current word is correct, advance to the next word
         if isCorrect {
+            // If this word was previously added to the practice list, check if it should be removed
+            if isImportant, let addedTime = incorrectImportantWordTimestamps[currentWord] {
+                let now = Date()
+                let allowedTime: TimeInterval = isFirstInSentence ? 3.0 : 1.0
+                if now.timeIntervalSince(addedTime) <= allowedTime {
+                    // Remove from practice list and timestamp tracking
+                    incorrectImportantWordsSet.remove(currentWord)
+                    incorrectImportantWordTimestamps.removeValue(forKey: currentWord)
+                }
+            }
             correctWords += 1
             currentWordAttempts = 0 // Reset attempts
             currentWordStartTime = nil // Reset start time
@@ -186,16 +207,14 @@ struct ReadingSession {
         // Only add to practice list if user is genuinely stuck (multiple attempts or significant time)
         // This prevents adding words that are briefly misrecognized but then corrected
         if !isCorrect {
-            let currentWord = paragraph.words[currentWordIndex]
-            let isImportant = WordClassifier.isImportantWord(currentWord)
-            
             // Consider user stuck if they've made multiple attempts OR spent significant time
             let timeSpent = currentWordStartTime != nil ? Date().timeIntervalSince(currentWordStartTime!) : 0.0
             let isStuck = currentWordAttempts >= 2 || timeSpent > 2.0 // 5 seconds
-            
             if isImportant && isStuck {
-                incorrectImportantWordsSet.insert(currentWord)
-
+                if !incorrectImportantWordsSet.contains(currentWord) {
+                    incorrectImportantWordsSet.insert(currentWord)
+                    incorrectImportantWordTimestamps[currentWord] = Date()
+                }
             }
         }
         
@@ -298,5 +317,12 @@ struct ReadingSession {
         
         // Reset correct words count
         correctWords = wordAnalyses.prefix(sentenceStart).filter { $0.isCorrect }.count
+    }
+    
+    // Helper to check if a word is the first word of a sentence
+    func isFirstWordOfSentence(_ index: Int) -> Bool {
+        if index == 0 { return true }
+        let prevWord = paragraph.words[index - 1]
+        return prevWord.hasSuffix(".") || prevWord.hasSuffix("!") || prevWord.hasSuffix("?")
     }
 } 
