@@ -150,7 +150,6 @@ struct TappableTextView: View {
 
 struct TranscriptionView: View {
     let transcribedText: String
-    let confidence: Float
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -172,22 +171,6 @@ struct TranscriptionView: View {
             .frame(maxWidth: .infinity, alignment: .center)
             .background(Color(.systemGray6))
             .cornerRadius(8)
-
-            if !transcribedText.isEmpty {
-                HStack {
-                    Text("Confidence:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    ProgressView(value: confidence)
-                        .progressViewStyle(LinearProgressViewStyle())
-                        .frame(width: 100)
-
-                    Text("\(Int(confidence * 100))%")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
         }
         .padding()
         .background(Color(.systemBackground))

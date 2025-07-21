@@ -21,7 +21,7 @@ struct PracticeView: View {
                 }
             }
             .padding()
-            .navigationTitle("VocabCoach")
+            .navigationTitle("Vocab Coach")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -62,7 +62,7 @@ struct PracticeView: View {
                 .font(.system(size: 80))
                 .foregroundColor(.blue)
             
-            Text("Welcome to VocabCoach")
+            Text("Welcome to Vocab Coach")
                 .font(.largeTitle)
                 .fontWeight(.bold)
             
@@ -101,8 +101,7 @@ struct PracticeView: View {
             
             // Transcription view
             TranscriptionView(
-                transcribedText: speechManager.transcribedText,
-                confidence: speechManager.confidence
+                transcribedText: speechManager.transcribedText
             )
             
             // Control buttons
@@ -280,34 +279,14 @@ struct PracticeView: View {
     private func updateSession(with transcription: String) {
         guard var session = currentSession else { return }
         
-        // Check if we have high confidence speech recognition and sufficient transcription
-        let highConfidence = speechManager.confidence > 0.7 && transcription.count > 2
         
-        let wordCompleted = session.analyzeTranscription(transcription, confidence: speechManager.confidence)
+        let wordCompleted = session.analyzeTranscription(transcription)
         
         currentSession = session
         
-        // If a word was completed, clear the transcription for the next word
-        if wordCompleted {
-            speechManager.clearTranscription()
-        }
-        
-        // Provide feedback based on high confidence results
-        if let currentWord = session.currentWord, highConfidence {
+        if let currentWord = session.currentWord {
             let currentAnalysis = session.wordAnalyses.first { $0.expectedIndex == session.currentWordIndex }
             
-            if let analysis = currentAnalysis {
-                if analysis.isCorrect {
-                    // Word was pronounced correctly - provide positive feedback
-                    feedbackMessage = "Great! Now say: \(session.currentWord ?? "")"
-                } else if analysis.isMispronounced {
-                    // Word was mispronounced - provide specific feedback
-                    feedbackMessage = "Try saying '\(currentWord)' more clearly"
-                } else if analysis.isMissing {
-                    // Word was missing - prompt user
-                    feedbackMessage = "Please say: \(currentWord)"
-                }
-            }
         } else if session.isCompleted {
             // All words completed - stop listening automatically
             speechManager.stopListening()
@@ -320,10 +299,7 @@ struct PracticeView: View {
                 let wordList = reviewWords.joined(separator: ", ")
                 feedbackMessage = "Great job! You completed the paragraph. Words to practice: \(wordList)"
             }
-        } else if !highConfidence && !transcription.isEmpty {
-            // Clear feedback when confidence is low but there's some transcription
-            feedbackMessage = ""
-        }
+        } 
     }
     
     private func handleWordTap(_ word: String) {
