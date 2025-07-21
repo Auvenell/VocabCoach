@@ -206,7 +206,7 @@ struct ReadingSession {
         // Reset attempts for new word
         currentWordAttempts = 0
         currentWordStartTime = nil // Reset start time for new word
-        
+
         // Mark current word as no longer current
         if currentWordIndex < wordAnalyses.count {
             let currentAnalysis = wordAnalyses[currentWordIndex]
@@ -221,10 +221,15 @@ struct ReadingSession {
                 isImportantWord: currentAnalysis.isImportantWord
             )
         }
-        
+
         // Move to next word
         currentWordIndex += 1
-        
+
+        // Haptic feedback for advancing to next word
+        DispatchQueue.main.async {
+            HapticManager.shared.mediumImpact()
+        }
+
         // Mark next word as current if we haven't finished
         if currentWordIndex < wordAnalyses.count {
             let nextAnalysis = wordAnalyses[currentWordIndex]

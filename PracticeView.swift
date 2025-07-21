@@ -282,6 +282,15 @@ struct PracticeView: View {
         
         let wordCompleted = session.analyzeTranscription(transcription)
         
+        // Haptic feedback for correct word
+        print("[DEBUG] wordCompleted: \(wordCompleted)")
+        if wordCompleted {
+            print("[DEBUG] Triggering haptic feedback for correct word")
+            DispatchQueue.main.async {
+                HapticManager.shared.mediumImpact()
+            }
+        }
+        
         currentSession = session
         
         if let currentWord = session.currentWord {
@@ -303,6 +312,9 @@ struct PracticeView: View {
     }
     
     private func handleWordTap(_ word: String) {
+        DispatchQueue.main.async {
+            HapticManager.shared.mediumImpact()
+        }
         ttsManager.speakWord(word)
     }
     

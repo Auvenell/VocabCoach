@@ -48,6 +48,9 @@ class SpeechRecognitionManager: NSObject, ObservableObject {
         do {
             try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+            if #available(iOS 13.0, *) {
+                try? audioSession.setAllowHapticsAndSystemSoundsDuringRecording(true)
+            }
         } catch {
             errorMessage = "Failed to configure audio session: \(error.localizedDescription)"
             return
