@@ -225,14 +225,19 @@ struct PracticeView: View {
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                     
-                                    ForEach(reviewWords, id: \.self) { word in
-                                        HStack {
-                                            Text("• \(word)")
-                                                .font(.caption)
-                                                .foregroundColor(.red)
-                                            Spacer()
+                                    ScrollView {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            ForEach(reviewWords, id: \.self) { word in
+                                                HStack {
+                                                    Text("• \(word)")
+                                                        .font(.caption)
+                                                        .foregroundColor(.red)
+                                                    Spacer()
+                                                }
+                                            }
                                         }
                                     }
+                                    .frame(maxHeight: 120)
                                 }
                             }
                         }

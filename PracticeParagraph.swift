@@ -47,27 +47,28 @@ struct WordClassifier {
     static func isImportantWord(_ word: String) -> Bool {
         // Remove punctuation for classification
         let cleanWord = word.trimmingCharacters(in: .punctuationCharacters).lowercased()
-        // Exception for articles 'a' and 'an', and function words 'is' and 'for'
-        if ["a", "an", "is", "for"].contains(cleanWord) {
+        // Exception for articles 'a' and 'an', function words 'is' and 'for', and pronouns 'i', 'my', 'we'
+        if ["a", "an", "is", "for", "i", "my", "we"].contains(cleanWord) {
+            print("[WordClassifier] '", word, "' (clean: '", cleanWord, "') is NOT important (article/function/pronoun word)")
             return false
         }
-        
         // If the word is just punctuation, it's not important
         if cleanWord.isEmpty {
+            print("[WordClassifier] '", word, "' (clean: '", cleanWord, "') is NOT important (empty after cleaning)")
             return false
         }
-        
         let tagger = NLTagger(tagSchemes: [.lexicalClass])
         tagger.string = cleanWord
-        
         var result = false
+        var foundTag: NLTag? = nil
         tagger.enumerateTags(in: cleanWord.startIndex..<cleanWord.endIndex, unit: .word, scheme: .lexicalClass) { tag, tokenRange in
+            foundTag = tag
             if let tag = tag {
                 result = importantWordTypes.contains(tag)
             }
             return false // Stop after first word
         }
-        
+        print("[WordClassifier] '", word, "' (clean: '", cleanWord, "') tag: ", String(describing: foundTag), " => important: ", result)
         return result
     }
 }
