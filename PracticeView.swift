@@ -150,8 +150,10 @@ struct PracticeView: View {
                         .background(speechManager.isListening ? Color.red : Color.green)
                         .cornerRadius(16)
                         .shadow(color: speechManager.isListening ? .blue.opacity(0.5) : .clear, radius: 10, x: 0, y: 0)
+                        .opacity(session.isCompleted ? 0.5 : 1.0)
                     }
                     .accessibilityLabel(speechManager.isListening ? "Stop Listening" : "Start Reading")
+                    .disabled(session.isCompleted)
                     
                     // Reset button - changes behavior based on completion state
                     Button(action: {
