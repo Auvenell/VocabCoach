@@ -33,8 +33,8 @@ class ParagraphDataManager: ObservableObject {
             ),
             
             PracticeParagraph(
-                title: "Healthy Living",
-                text: "Maintaining a healthy lifestyle requires dedication and consistency. Regular exercise strengthens your body and improves mental health. Eating nutritious foods provides essential vitamins and minerals. Getting enough sleep is crucial for overall well-being.",
+                title: "Healthy Living  a healthy lifestyle is essential for long-term well-being and requires both dedication and consistency",
+                text: "Maintaining a healthy lifestyle is essential for long-term well-being and requires both dedication and consistency. It’s not about quick fixes or extreme routines, but rather building sustainable habits that support your body and mind every day. One of the cornerstones of a healthy lifestyle is regular physical activity. Exercise does more than just tone muscles it boosts cardiovascular health, enhances flexibility, and releases endorphins that improve mood and reduce stress. Whether it’s walking, swimming, strength training, or yoga, consistent movement plays a vital role in physical and mental resilience. Equally important is proper nutrition. Fueling the body with a balanced diet rich in whole foods provides essential vitamins, minerals, and nutrients that help the body function efficiently. A diet high in fruits, vegetables, lean proteins, and whole grains not only supports physical health but can also positively influence energy levels, focus, and even emotional well-being. Sleep is another crucial pillar of health that is often overlooked. Getting sufficient and quality rest each night allows the body to recover, strengthens the immune system, and helps regulate mood and cognitive function. Chronic sleep deprivation, on the other hand, can lead to a host of physical and mental health issues over time.",
                 difficulty: .intermediate,
                 category: .general
             ),

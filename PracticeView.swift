@@ -21,9 +21,16 @@ struct PracticeView: View {
                 }
             }
             .padding()
-            .navigationTitle("Vocab Coach")
-            .navigationBarTitleDisplayMode(.large)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if let session = currentSession {
+                        Text(session.paragraph.title)
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Select Text") {
                         showingParagraphSelector = true
@@ -90,14 +97,16 @@ struct PracticeView: View {
     @ViewBuilder
     private func practiceSessionView(session: ReadingSession) -> some View {
         VStack(spacing: 20) {
-            // Paragraph display
-            TappableTextView(
-                paragraph: session.paragraph,
-                wordAnalyses: session.wordAnalyses,
-                onWordTap: { word in
-                    handleWordTap(word)
-                }
-            )
+            ScrollView {
+                TappableTextView(
+                    paragraph: session.paragraph,
+                    wordAnalyses: session.wordAnalyses,
+                    onWordTap: { word in
+                        handleWordTap(word)
+                    }
+                )
+            }
+            .frame(height: 300) // Fixed height to prevent layout shift
             
             // Transcription view
             TranscriptionView(

@@ -120,22 +120,41 @@ struct ReadingSession {
         // Only analyze the current word
         guard currentWordIndex < paragraph.words.count else { return false }
         
-        let expectedWord = paragraph.words[currentWordIndex].lowercased().trimmingCharacters(in: .punctuationCharacters)
+        let expectedWordRaw = paragraph.words[currentWordIndex]
+        let expectedWord = expectedWordRaw.lowercased().trimmingCharacters(in: .punctuationCharacters)
+        
+        // Normalize apostrophes to straight (') for comparison
+        func normalizeApostrophes(_ s: String) -> String {
+            s.replacingOccurrences(of: "’", with: "'")
+        }
+        let normalizedExpected = normalizeApostrophes(expectedWord)
+        
+        // Debug logging
+        // print("[DEBUG] analyzeTranscription")
+        // print("[DEBUG] Transcription: \(transcription)")
+        // print("[DEBUG] Spoken words: \(spokenWords)")
+        // print("[DEBUG] Expected word (raw): \(expectedWordRaw)")
+        // print("[DEBUG] Expected word (processed): \(expectedWord)")
+        // print("[DEBUG] Expected word (normalized): \(normalizedExpected)")
         
         // Check if the expected word appears anywhere in the spoken words
         // Use more flexible matching for unclear pronunciations
         let userSpoken = spokenWords.first { spokenWord in
+            let normalizedSpoken = normalizeApostrophes(spokenWord)
             // Exact match
-            if spokenWord == expectedWord {
+            if normalizedSpoken == normalizedExpected {
+                // print("[DEBUG] Matched normalizedSpoken == normalizedExpected: \(normalizedSpoken)")
                 return true
             }
-            
+            // Add more contraction flexibility logging here if needed
             return false
         }
         
         let isCorrect = userSpoken != nil
-        let isMissing = spokenWords.isEmpty || !spokenWords.contains { $0 == expectedWord }
+        let isMissing = spokenWords.isEmpty || !spokenWords.contains { normalizeApostrophes($0) == normalizedExpected }
         let isMispronounced = !isMissing && !isCorrect
+        
+        // print("[DEBUG] isCorrect: \(isCorrect), isMissing: \(isMissing), isMispronounced: \(isMispronounced)")
         
         // Update the current word analysis
         if currentWordIndex < wordAnalyses.count {
