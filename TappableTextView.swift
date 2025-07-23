@@ -76,6 +76,7 @@ struct TappableTextView: View {
     let paragraph: PracticeParagraph
     let wordAnalyses: [WordAnalysis]
     let onWordTap: (String) -> Void
+    let scrollTargetIndex: Int?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -102,6 +103,7 @@ struct TappableTextView: View {
                     )
                     .cornerRadius(4)
                     .onTapGesture { onWordTap(word) }
+                    .id(offset)
             }
         }
         .padding()

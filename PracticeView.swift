@@ -10,6 +10,7 @@ struct PracticeView: View {
     @State private var showingParagraphSelector = false
     @State private var showingResults = false
     @State private var feedbackMessage = ""
+    @State private var scrollTargetIndex: Int? = nil
     
     var body: some View {
         NavigationView {
@@ -96,143 +97,153 @@ struct PracticeView: View {
     
     @ViewBuilder
     private func practiceSessionView(session: ReadingSession) -> some View {
-        VStack(spacing: 20) {
-            ScrollView {
-                TappableTextView(
-                    paragraph: session.paragraph,
-                    wordAnalyses: session.wordAnalyses,
-                    onWordTap: { word in
-                        handleWordTap(word)
+        ScrollViewReader { scrollProxy in
+            VStack(spacing: 20) {
+                ScrollView {
+                    TappableTextView(
+                        paragraph: session.paragraph,
+                        wordAnalyses: session.wordAnalyses,
+                        onWordTap: { word in
+                            handleWordTap(word)
+                        },
+                        scrollTargetIndex: scrollTargetIndex
+                    )
+                }
+                .frame(height: 300)
+                .onChange(of: scrollTargetIndex) { _, idx in
+                    if let idx = idx {
+                        withAnimation {
+                            scrollProxy.scrollTo(idx, anchor: .top)
+                        }
                     }
+                }
+            
+                // Transcription view
+                TranscriptionView(
+                    transcribedText: speechManager.transcribedText
                 )
-            }
-            .frame(height: 300) // Fixed height to prevent layout shift
-            
-            // Transcription view
-            TranscriptionView(
-                transcribedText: speechManager.transcribedText
-            )
-            
-            // Control buttons
-            VStack(spacing: 12) {
-                // Start/Stop Reading button (prominent)
-                Button(action: {
-                    if speechManager.isListening {
-                        stopPractice()
-                    } else {
-                        startPractice()
-                    }
-                }) {
-                    HStack(spacing: 12) {
-                        Image(systemName: speechManager.isListening ? "waveform.circle.fill" : "play.circle.fill")
-                            .font(.system(size: 32))
-                            .foregroundColor(.white)
-                            .shadow(color: speechManager.isListening ? .blue.opacity(0.7) : .clear, radius: 10, x: 0, y: 0)
-                            .scaleEffect(speechManager.isListening ? 1.2 : 1.0)
-                            .animation(.easeInOut(duration: 0.2), value: speechManager.isListening)
-                        Text(speechManager.isListening ? "Stop" : "Start Reading")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(speechManager.isListening ? Color.red : Color.green)
-                    .cornerRadius(16)
-                    .shadow(color: speechManager.isListening ? .blue.opacity(0.5) : .clear, radius: 10, x: 0, y: 0)
-                }
-                .accessibilityLabel(speechManager.isListening ? "Stop Listening" : "Start Reading")
                 
-                // Reset button - changes behavior based on completion state
-                Button(action: {
-                    if session.isCompleted {
-                        resetSession()
-                    } else {
-                        resetToSentenceStart()
+                // Control buttons
+                VStack(spacing: 12) {
+                    // Start/Stop Reading button (prominent)
+                    Button(action: {
+                        if speechManager.isListening {
+                            stopPractice()
+                        } else {
+                            startPractice()
+                        }
+                    }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: speechManager.isListening ? "waveform.circle.fill" : "play.circle.fill")
+                                .font(.system(size: 32))
+                                .foregroundColor(.white)
+                                .shadow(color: speechManager.isListening ? .blue.opacity(0.7) : .clear, radius: 10, x: 0, y: 0)
+                                .scaleEffect(speechManager.isListening ? 1.2 : 1.0)
+                                .animation(.easeInOut(duration: 0.2), value: speechManager.isListening)
+                            Text(speechManager.isListening ? "Stop" : "Start Reading")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(speechManager.isListening ? Color.red : Color.green)
+                        .cornerRadius(16)
+                        .shadow(color: speechManager.isListening ? .blue.opacity(0.5) : .clear, radius: 10, x: 0, y: 0)
                     }
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: session.isCompleted ? "arrow.counterclockwise" : "arrow.clockwise")
-                            .font(.system(size: 16))
-                            .foregroundColor(.blue)
-                        Text(session.isCompleted ? "Start Over" : "Start from beginning of sentence")
-                            .font(.subheadline)
-                            .foregroundColor(.blue)
+                    .accessibilityLabel(speechManager.isListening ? "Stop Listening" : "Start Reading")
+                    
+                    // Reset button - changes behavior based on completion state
+                    Button(action: {
+                        if session.isCompleted {
+                            resetSession()
+                        } else {
+                            resetToSentenceStart()
+                        }
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: session.isCompleted ? "arrow.counterclockwise" : "arrow.clockwise")
+                                .font(.system(size: 16))
+                                .foregroundColor(.blue)
+                            Text(session.isCompleted ? "Start Over" : "Start from beginning of sentence")
+                                .font(.subheadline)
+                                .foregroundColor(.blue)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(8)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(Color.blue.opacity(0.1))
-                    .cornerRadius(8)
                 }
-            }
-            .padding(.top, 16)
-            
-            // Progress indicator
-            if session.totalWords > 0 {
-                VStack(spacing: 8) {
-                    HStack {
-                        Text("Progress:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Text("\(session.correctWords)/\(session.totalWords) words")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    ProgressView(value: session.accuracy)
-                        .progressViewStyle(LinearProgressViewStyle())
-                        .accentColor(session.accuracy > 0.8 ? .green : session.accuracy > 0.6 ? .orange : .red)
-                    
-                    // Current word indicator
-                    if let currentWord = session.currentWord {
+                .padding(.top, 16)
+                
+                // Progress indicator
+                if session.totalWords > 0 {
+                    VStack(spacing: 8) {
                         HStack {
-                            Text("Current word:")
+                            Text("Progress:")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            Text(currentWord)
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(.blue)
                             Spacer()
-                            Text("Word \(session.currentWordIndex + 1) of \(session.totalWords)")
+                            Text("\(session.correctWords)/\(session.totalWords) words")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
-                    } else if session.isCompleted {
-                        VStack(alignment: .leading, spacing: 8) {
+                        
+                        ProgressView(value: session.accuracy)
+                            .progressViewStyle(LinearProgressViewStyle())
+                            .accentColor(session.accuracy > 0.8 ? .green : session.accuracy > 0.6 ? .orange : .red)
+                        
+                        // Current word indicator
+                        if let currentWord = session.currentWord {
                             HStack {
-                                Text("✅ Completed!")
-                                    .font(.caption)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.green)
-                                Spacer()
-                            }
-                            
-                            let reviewWords = session.wordsToReview
-                            if !reviewWords.isEmpty {
-                                Text("Words to practice:")
+                                Text("Current word:")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
+                                Text(currentWord)
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.blue)
+                                Spacer()
+                                Text("Word \(session.currentWordIndex + 1) of \(session.totalWords)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        } else if session.isCompleted {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text("✅ Completed!")
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.green)
+                                    Spacer()
+                                }
                                 
-                                ForEach(reviewWords, id: \.self) { word in
-                                    HStack {
-                                        Text("• \(word)")
-                                            .font(.caption)
-                                            .foregroundColor(.red)
-                                        Spacer()
+                                let reviewWords = session.wordsToReview
+                                if !reviewWords.isEmpty {
+                                    Text("Words to practice:")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    
+                                    ForEach(reviewWords, id: \.self) { word in
+                                        HStack {
+                                            Text("• \(word)")
+                                                .font(.caption)
+                                                .foregroundColor(.red)
+                                            Spacer()
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(8)
                 }
-                .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(8)
+                
+                Spacer()
             }
-            
-            Spacer()
         }
     }
     
@@ -240,6 +251,7 @@ struct PracticeView: View {
         currentSession = ReadingSession(paragraph: paragraph)
         speechManager.reset()
         ttsManager.stopSpeaking()
+        scrollTargetIndex = 0
     }
     
     private func startPractice() {
@@ -287,8 +299,7 @@ struct PracticeView: View {
     
     private func updateSession(with transcription: String) {
         guard var session = currentSession else { return }
-        
-        
+        let previousWordIndex = session.currentWordIndex
         let wordCompleted = session.analyzeTranscription(transcription)
         
         // Haptic feedback for correct word
@@ -301,6 +312,20 @@ struct PracticeView: View {
         }
         
         currentSession = session
+        
+        // HYBRID SCROLL: only scroll if currentWordIndex > buffer, and scroll to currentWordIndex - buffer
+        let buffer = 5
+        let totalWords = session.paragraph.words.count
+        let targetIndex: Int
+        if session.currentWordIndex > buffer {
+            targetIndex = session.currentWordIndex - buffer
+        } else {
+            targetIndex = 0
+        }
+        scrollTargetIndex = targetIndex
+        if previousWordIndex > session.currentWordIndex { // reset or rewind
+            scrollTargetIndex = 0
+        }
         
         if let currentWord = session.currentWord {
             let currentAnalysis = session.wordAnalyses.first { $0.expectedIndex == session.currentWordIndex }
@@ -347,6 +372,7 @@ struct PracticeView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             ttsManager.speakFeedback("Starting over. Begin reading the paragraph aloud.")
         }
+        scrollTargetIndex = 0
     }
     
     private func resetToSentenceStart() {
@@ -379,6 +405,7 @@ struct PracticeView: View {
                 ttsManager.speakFeedback("Starting from: \(currentWord)")
             }
         }
+        scrollTargetIndex = 0
     }
     
 
