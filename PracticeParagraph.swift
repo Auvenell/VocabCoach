@@ -2,7 +2,7 @@ import Foundation
 import NaturalLanguage
 
 struct PracticeParagraph: Identifiable {
-    let id = UUID()
+    let id: String
     let title: String
     let text: String
     let difficulty: Difficulty
@@ -330,5 +330,10 @@ struct ReadingSession {
         if index == 0 { return true }
         let prevWord = paragraph.words[index - 1]
         return prevWord.hasSuffix(".") || prevWord.hasSuffix("!") || prevWord.hasSuffix("?")
+    }
+    
+    // Public method to skip the current word
+    mutating func skipCurrentWord() {
+        advanceToNextWord()
     }
 } 

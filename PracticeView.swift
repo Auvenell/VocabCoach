@@ -11,6 +11,7 @@ struct PracticeView: View {
     @State private var showingResults = false
     @State private var feedbackMessage = ""
     @State private var scrollTargetIndex: Int? = nil
+    @State private var showQuestions = false
     
     var body: some View {
         NavigationView {
@@ -19,6 +20,12 @@ struct PracticeView: View {
                     practiceSessionView(session: session)
                 } else {
                     welcomeView
+                }
+                NavigationLink(
+                    destination: selectedParagraph.map { QuestionsView(articleId: $0.id) },
+                    isActive: $showQuestions
+                ) {
+                    EmptyView()
                 }
             }
             .padding()
@@ -176,6 +183,25 @@ struct PracticeView: View {
                         .background(Color.blue.opacity(0.1))
                         .cornerRadius(8)
                     }
+                    // Skip Word button
+                    if !session.isCompleted, session.currentWord != nil {
+                        Button(action: {
+                            skipCurrentWord()
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "forward.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.orange)
+                                Text("Skip Word")
+                                    .font(.subheadline)
+                                    .foregroundColor(.orange)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.orange.opacity(0.1))
+                            .cornerRadius(8)
+                        }
+                    }
                 }
                 .padding(.top, 16)
                 
@@ -240,6 +266,10 @@ struct PracticeView: View {
                                         }
                                     }
                                     .frame(maxHeight: 120)
+                                }
+                                // Trigger navigation to questions when completed
+                                Button("Continue to Questions") {
+                                    showQuestions = true
                                 }
                             }
                         }
@@ -349,6 +379,10 @@ struct PracticeView: View {
                 let wordList = reviewWords.joined(separator: ", ")
                 feedbackMessage = "Great job! You completed the paragraph. Words to practice: \(wordList)"
             }
+            // Set selectedParagraph for navigation
+            if let sessionParagraph = currentSession?.paragraph {
+                selectedParagraph = sessionParagraph
+            }
         } 
     }
     
@@ -415,6 +449,19 @@ struct PracticeView: View {
         scrollTargetIndex = 0
     }
     
+    private func skipCurrentWord() {
+        guard var session = currentSession, !session.isCompleted, session.currentWord != nil else { return }
+        session.skipCurrentWord()
+        currentSession = session
+        // Haptic feedback for skipping
+        DispatchQueue.main.async {
+            HapticManager.shared.mediumImpact()
+        }
+        // Optionally, scroll to keep the current word in view
+        let buffer = 5
+        let targetIndex = session.currentWordIndex > buffer ? session.currentWordIndex - buffer : 0
+        scrollTargetIndex = targetIndex
+    }
 
 }
 
