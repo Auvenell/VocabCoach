@@ -92,15 +92,15 @@ struct TappableTextView: View {
                 let (offset, word) = pair
                 let analysis = wordAnalyses.first { $0.expectedIndex == offset }
                 return Text(word)
-                    .font(.body)
+                    .font(.title2)
                     .foregroundColor(textColor(for: analysis))
                     .background(backgroundColor(for: analysis))
+                    .padding(analysis?.isCurrentWord == true ? 4 : 2)
                     .overlay(
                         RoundedRectangle(cornerRadius: 4)
                             .stroke(borderColor(for: analysis), lineWidth: analysis?.isCurrentWord == true ? 2 : 0)
                     )
                     .cornerRadius(4)
-                    .padding(analysis?.isCurrentWord == true ? 2 : 0)
                     .onTapGesture { onWordTap(word) }
             }
         }
