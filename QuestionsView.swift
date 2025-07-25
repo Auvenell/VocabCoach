@@ -3,55 +3,66 @@ import FirebaseFirestore
 
 struct QuestionsView: View {
     let articleId: String
-    init(articleId: String) {
-        self.articleId = articleId
-    }
-    @State private var questions: [ComprehensionQuestion] = []
+    @StateObject private var viewModel = ArticleViewModel()
     @State private var isLoading = true
-    private var db = Firestore.firestore()
 
     var body: some View {
         VStack {
             if isLoading {
                 ProgressView("Loading questions...")
-            } else if questions.isEmpty {
+            } else if viewModel.openEndedQuestions.isEmpty && viewModel.multipleChoiceQuestions.isEmpty {
                 Text("No questions found for this article.")
                     .foregroundColor(.gray)
             } else {
-                List(questions) { question in
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(question.questionText)
-                            .font(.headline)
-                        Text("Answer: \(question.answer)")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
+                List {
+                    if !viewModel.openEndedQuestions.isEmpty {
+                        Section(header: Text("Open-Ended Questions")) {
+                            ForEach(viewModel.openEndedQuestions) { question in
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(question.questionText)
+                                        .font(.headline)
+                                    Text("Answer: \(question.answer)")
+                                        .font(.subheadline)
+                                        .foregroundColor(.gray)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
                     }
-                    .padding(.vertical, 4)
+                    if !viewModel.multipleChoiceQuestions.isEmpty {
+                        Section(header: Text("Multiple Choice Questions")) {
+                            ForEach(viewModel.multipleChoiceQuestions) { question in
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(question.questionText)
+                                        .font(.headline)
+                                    ForEach(question.choices, id: \.self) { choice in
+                                        HStack {
+                                            Text(choice)
+                                                .padding(6)
+                                                .background(choice == question.answer ? Color.green.opacity(0.2) : Color.clear)
+                                                .cornerRadius(6)
+                                            if choice == question.answer {
+                                                Text("(Correct)")
+                                                    .font(.caption)
+                                                    .foregroundColor(.green)
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                    }
                 }
             }
         }
         .navigationTitle("Questions")
         .onAppear {
-            fetchQuestions()
-        }
-    }
-
-    private func fetchQuestions() {
-        db.collection("comprehension_questions")
-            .whereField("articleId", isEqualTo: articleId)
-            .getDocuments { snapshot, error in
-                if let documents = snapshot?.documents {
-                    self.questions = documents.compactMap { doc in
-                        let data = doc.data()
-                        return ComprehensionQuestion(
-                            id: doc.documentID,
-                            articleId: (data["articleId"] as? String) ?? "",
-                            questionText: data["questionText"] as? String ?? "",
-                            answer: data["answer"] as? String ?? ""
-                        )
-                    }
-                }
-                self.isLoading = false
+            viewModel.fetchQuestions(for: articleId)
+            // Add a slight delay to show loading spinner
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                isLoading = false
             }
+        }
     }
 }

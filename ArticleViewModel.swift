@@ -16,9 +16,17 @@ struct ComprehensionQuestion: Identifiable {
     var answer: String
 }
 
+struct MultipleChoiceQuestion: Identifiable {
+    var id: String { questionText } // Use questionText as unique id for now
+    var questionText: String
+    var choices: [String]
+    var answer: String
+}
+
 class ArticleViewModel: ObservableObject {
     @Published var articles: [Article] = []
-    @Published var questions: [ComprehensionQuestion] = []
+    @Published var openEndedQuestions: [ComprehensionQuestion] = []
+    @Published var multipleChoiceQuestions: [MultipleChoiceQuestion] = []
 
     private var db = Firestore.firestore()
 
@@ -39,19 +47,38 @@ class ArticleViewModel: ObservableObject {
     }
 
     func fetchQuestions(for articleId: String) {
-        db.collection("comprehension_questions")
-            .whereField("articleId", isEqualTo: articleId)
-            .getDocuments { snapshot, error in
-                guard let documents = snapshot?.documents else { return }
-                self.questions = documents.compactMap { doc in
-                    let data = doc.data()
+        db.collection("articles").document(articleId).getDocument { snapshot, error in
+            guard let data = snapshot?.data() else { return }
+            // Open-ended questions
+            if let questionsArray = data["questions"] as? [[String: Any]] {
+                self.openEndedQuestions = questionsArray.compactMap { dict in
+                    guard let questionText = dict["questionText"] as? String,
+                          let answer = dict["answer"] as? String else { return nil }
                     return ComprehensionQuestion(
-                        id: doc.documentID,
-                        articleId: (data["articleId"] as? String) ?? "",
-                        questionText: data["questionText"] as? String ?? "",
-                        answer: data["answer"] as? String ?? ""
+                        id: UUID().uuidString,
+                        articleId: articleId,
+                        questionText: questionText,
+                        answer: answer
                     )
                 }
+            } else {
+                self.openEndedQuestions = []
             }
+            // Multiple choice questions
+            if let mcqArray = data["multiple_choice_questions"] as? [[String: Any]] {
+                self.multipleChoiceQuestions = mcqArray.compactMap { dict in
+                    guard let questionText = dict["questionText"] as? String,
+                          let answer = dict["answer"] as? String else { return nil }
+                    let choices = [dict["choice_a"], dict["choice_b"], dict["choice_c"], dict["choice_d"]].compactMap { $0 as? String }
+                    return MultipleChoiceQuestion(
+                        questionText: questionText,
+                        choices: choices,
+                        answer: answer
+                    )
+                }
+            } else {
+                self.multipleChoiceQuestions = []
+            }
+        }
     }
 } 
