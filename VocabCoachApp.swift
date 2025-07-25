@@ -18,11 +18,21 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
 @main
 struct VocabCoachApp: App {
-    @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
-
+    @StateObject private var userSession = UserSession()
+    
+    init() {
+        FirebaseApp.configure()
+    }
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            if userSession.user != nil {
+                ContentView()
+                    .environmentObject(userSession)
+            } else {
+                LoginView()
+                    .environmentObject(userSession)
+            }
         }
     }
 }
