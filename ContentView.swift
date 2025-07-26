@@ -10,6 +10,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var userSession: UserSession
     @State private var isSidebarShowing = false
+    @State private var showingParagraphSelector = false
     
     var body: some View {
         ZStack {
@@ -47,13 +48,15 @@ struct ContentView: View {
                 .padding(.top, 8)
                 
                 // Main content area
-                PracticeView()
+                PracticeView(showingParagraphSelector: $showingParagraphSelector)
                 
                 Spacer()
             }
             
             // Sidebar overlay
-            SidebarView(isShowing: $isSidebarShowing)
+            SidebarView(isShowing: $isSidebarShowing) {
+                showingParagraphSelector = true
+            }
         }
     }
 }

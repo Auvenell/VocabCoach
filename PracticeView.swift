@@ -7,7 +7,7 @@ struct PracticeView: View {
     
     @State private var currentSession: ReadingSession?
     @State private var selectedParagraph: PracticeParagraph?
-    @State private var showingParagraphSelector = false
+    @Binding var showingParagraphSelector: Bool
     @State private var showingResults = false
     @State private var feedbackMessage = ""
     @State private var scrollTargetIndex: Int? = nil
@@ -39,11 +39,7 @@ struct PracticeView: View {
                             .truncationMode(.tail)
                     }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Select Text") {
-                        showingParagraphSelector = true
-                    }
-                }
+
             }
             .sheet(isPresented: $showingParagraphSelector) {
                 ParagraphSelectorView(

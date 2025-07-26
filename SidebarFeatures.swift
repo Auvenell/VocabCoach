@@ -292,4 +292,11 @@ struct EnhancedSidebarView: View {
 #Preview {
     EnhancedSidebarView(isShowing: .constant(true))
         .environmentObject(UserSession())
+}
+
+#Preview {
+    SidebarView(isShowing: .constant(true)) {
+        // Select text action
+    }
+    .environmentObject(UserSession())
 } 

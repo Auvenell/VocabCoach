@@ -10,6 +10,7 @@ import SwiftUI
 struct SidebarView: View {
     @Binding var isShowing: Bool
     @EnvironmentObject var userSession: UserSession
+    var onSelectText: (() -> Void)?
     
     var body: some View {
         ZStack {
@@ -60,6 +61,17 @@ struct SidebarView: View {
                             isActive: true
                         ) {
                             // Navigate to practice
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                isShowing = false
+                            }
+                        }
+                        
+                        SidebarMenuItem(
+                            icon: "doc.text",
+                            title: "Select Text",
+                            isActive: false
+                        ) {
+                            onSelectText?()
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 isShowing = false
                             }
@@ -165,6 +177,8 @@ struct SidebarMenuItem: View {
 }
 
 #Preview {
-    SidebarView(isShowing: .constant(true))
-        .environmentObject(UserSession())
+    SidebarView(isShowing: .constant(true)) {
+        // Select text action
+    }
+    .environmentObject(UserSession())
 } 
