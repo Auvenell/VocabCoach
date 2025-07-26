@@ -16,17 +16,22 @@ class WordMatcher {
             return true
         }
         
-        // 2. Homonym matching
+        // 2. Possessive form matching
+        if isPossessiveMatch(expected: normalizedExpected, spoken: normalizedSpoken) {
+            return true
+        }
+        
+        // 3. Homonym matching
         if isHomonymMatch(expected: normalizedExpected, spoken: normalizedSpoken) {
             return true
         }
         
-        // 3. Phonetic similarity matching
+        // 4. Phonetic similarity matching
         if isPhoneticallySimilar(expected: normalizedExpected, spoken: normalizedSpoken) {
             return true
         }
         
-        // 4. Common speech recognition error patterns
+        // 5. Common speech recognition error patterns
         if isCommonRecognitionError(expected: normalizedExpected, spoken: normalizedSpoken) {
             return true
         }
@@ -38,9 +43,141 @@ class WordMatcher {
     private func normalizeWord(_ word: String) -> String {
         return word.lowercased()
             .trimmingCharacters(in: .punctuationCharacters)
+            .replacingOccurrences(of: "’", with: "'") // curly to straight
             .replacingOccurrences(of: "'", with: "'")
             .replacingOccurrences(of: "\"", with: "'")
-            .replacingOccurrences(of: "'", with: "'")
+    }
+    
+    /// Check if words are possessive forms of each other
+    private func isPossessiveMatch(expected: String, spoken: String) -> Bool {
+        // Handle cases like "industry's" vs "industries"
+        
+        // Case 1: Expected is possessive, spoken is plural
+        if expected.hasSuffix("'s") {
+            let baseWord = String(expected.dropLast(2)) // Remove "'s"
+            if spoken == baseWord + "s" || spoken == baseWord + "es" {
+                return true
+            }
+            // Handle y -> ies (e.g., industry's vs industries)
+            if baseWord.hasSuffix("y") {
+                let stem = String(baseWord.dropLast())
+                if spoken == stem + "ies" {
+                    return true
+                }
+            }
+        }
+        
+        // Case 2: Expected is plural, spoken is possessive
+        if expected.hasSuffix("s") && !expected.hasSuffix("'s") {
+            if spoken == expected + "'s" {
+                return true
+            }
+            // Handle ies -> y's (e.g., industries vs industry's)
+            if expected.hasSuffix("ies") {
+                let stem = String(expected.dropLast(3))
+                if spoken == stem + "y's" {
+                    return true
+                }
+            }
+        }
+        
+        // Case 3: Handle irregular plurals that might be confused with possessives
+        let irregularPossessives: [(String, String)] = [
+            ("children's", "children"),
+            ("men's", "men"),
+            ("women's", "women"),
+            ("people's", "people"),
+            ("mice's", "mice"),
+            ("geese's", "geese"),
+            ("feet's", "feet"),
+            ("teeth's", "teeth"),
+            ("knives's", "knives"),
+            ("lives's", "lives"),
+            ("wives's", "wives"),
+            ("wolves's", "wolves"),
+            ("leaves's", "leaves"),
+            ("shelves's", "shelves"),
+            ("calves's", "calves"),
+            ("halves's", "halves"),
+            ("thieves's", "thieves"),
+            ("loaves's", "loaves"),
+            ("scarves's", "scarves"),
+            ("wharves's", "wharves"),
+            ("hooves's", "hooves"),
+            ("dwarves's", "dwarves"),
+            ("elves's", "elves"),
+            ("selves's", "selves"),
+            ("books's", "books"),
+            ("looks's", "looks"),
+            ("cooks's", "cooks"),
+            ("takes's", "takes"),
+            ("makes's", "makes"),
+            ("gives's", "gives"),
+            ("comes's", "comes"),
+            ("does's", "does"),
+            ("says's", "says"),
+            ("goes's", "goes"),
+            ("knows's", "knows"),
+            ("shows's", "shows"),
+            ("grows's", "grows"),
+            ("throws's", "throws"),
+            ("blows's", "blows"),
+            ("flows's", "flows"),
+            ("glows's", "glows"),
+            ("slows's", "slows"),
+            ("stows's", "stows"),
+            ("tows's", "tows"),
+            ("rows's", "rows"),
+            ("sows's", "sows"),
+            ("mows's", "mows"),
+            ("bows's", "bows"),
+            ("cows's", "cows"),
+            ("vows's", "vows"),
+            ("pows's", "pows"),
+            ("jows's", "jows"),
+            ("lows's", "lows"),
+            ("nows's", "nows"),
+            ("how's", "how"),
+            ("what's", "what"),
+            ("where's", "where"),
+            ("when's", "when"),
+            ("why's", "why"),
+            ("who's", "who"),
+            ("it's", "it"),
+            ("he's", "he"),
+            ("she's", "she"),
+            ("we're", "we"),
+            ("they're", "they"),
+            ("you're", "you"),
+            ("I'm", "I"),
+            ("I'll", "I"),
+            ("I've", "I"),
+            ("I'd", "I"),
+            ("he'll", "he"),
+            ("she'll", "she"),
+            ("we'll", "we"),
+            ("they'll", "they"),
+            ("you'll", "you"),
+            ("he'd", "he"),
+            ("she'd", "she"),
+            ("we'd", "we"),
+            ("they'd", "they"),
+            ("you'd", "you"),
+            ("he's", "he"),
+            ("she's", "she"),
+            ("it's", "it"),
+            ("we've", "we"),
+            ("they've", "they"),
+            ("you've", "you")
+        ]
+        
+        for (possessive, base) in irregularPossessives {
+            if (expected == possessive && spoken == base) || (expected == base && spoken == possessive) {
+                return true
+            }
+        }
+        
+        return false
     }
     
     /// Check if words are homonyms (sound the same but spelled differently)
