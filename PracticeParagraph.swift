@@ -144,8 +144,12 @@ struct ReadingSession {
             isWordMatch(expected: expectedWordRaw, spoken: spokenWord)
         }
         
-        let isCorrect = userSpoken != nil
-        let isMissing = spokenWords.isEmpty || !spokenWords.contains { isWordMatch(expected: expectedWordRaw, spoken: $0) }
+        // If no match found, check for compound word match
+        let compoundWordMatch = userSpoken == nil && spokenWords.count >= 2 ? 
+            WordMatcher.shared.isCompoundWordMatch(expected: expectedWordRaw, lastTwoSpoken: spokenWords) : false
+        
+        let isCorrect = userSpoken != nil || compoundWordMatch
+        let isMissing = spokenWords.isEmpty || (!spokenWords.contains { isWordMatch(expected: expectedWordRaw, spoken: $0) } && !compoundWordMatch)
         let isMispronounced = !isMissing && !isCorrect
         
         // print("[DEBUG] isCorrect: \(isCorrect), isMissing: \(isMissing), isMispronounced: \(isMispronounced)")

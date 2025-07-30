@@ -44,6 +44,30 @@ class WordMatcher {
         return false
     }
     
+    /// Check if a compound word match (e.g., "wine maker" -> "winemaker")
+    func isCompoundWordMatch(expected: String, lastTwoSpoken: [String]) -> Bool {
+        guard lastTwoSpoken.count >= 2 else { return false }
+        
+        let normalizedExpected = normalizeWord(expected)
+        let concatenated = lastTwoSpoken.suffix(2).joined().lowercased()
+        let normalizedConcatenated = normalizeWord(concatenated)
+        
+        // Check if concatenated words match the expected word
+        if normalizedConcatenated == normalizedExpected {
+            return true
+        }
+        
+        // Also check with a hyphen (common compound format)
+        let hyphenated = lastTwoSpoken.suffix(2).joined(separator: "-").lowercased()
+        let normalizedHyphenated = normalizeWord(hyphenated)
+        
+        if normalizedHyphenated == normalizedExpected {
+            return true
+        }
+        
+        return false
+    }
+    
     /// Normalize word for comparison (lowercase, remove punctuation, normalize apostrophes)
     private func normalizeWord(_ word: String) -> String {
         return word.lowercased()
