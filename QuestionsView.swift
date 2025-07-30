@@ -29,41 +29,64 @@ struct QuestionsView: View {
                                     .font(.headline)
                                     .padding(.horizontal)
                                 
-                                ForEach(viewModel.multipleChoiceQuestions) { question in
+                                ForEach(Array(viewModel.multipleChoiceQuestions.enumerated()), id: \.element.id) { index, question in
                                     VStack(alignment: .leading, spacing: 12) {
-                                        Text(question.questionText)
-                                            .font(.headline)
-                                            .padding(.horizontal)
+                                        HStack(alignment: .top, spacing: 12) {
+                                            Text("\(index + 1)")
+                                                .font(.title2)
+                                                .fontWeight(.bold)
+                                                .foregroundColor(.white)
+                                                .frame(width: 32, height: 32)
+                                                .background(
+                                                    Circle()
+                                                        .fill(Color.blue)
+                                                )
+                                            
+                                            Text(question.questionText)
+                                                .font(.headline)
+                                        }
 
                                         VStack(spacing: 8) {
-                                            ForEach(question.choices, id: \.self) { choice in
-                                                Button(action: {
-                                                    selectedAnswers[question.questionText] = choice
-                                                    showSubmitButton = true
-                                                }) {
-                                                    HStack {
-                                                        Text(choice)
-                                                            .foregroundColor(.primary)
-                                                            .multilineTextAlignment(.leading)
-                                                        Spacer()
-                                                        if selectedAnswers[question.questionText] == choice {
-                                                            Image(systemName: "checkmark.circle.fill")
-                                                                .foregroundColor(.blue)
+                                            ForEach(Array(question.choices.enumerated()), id: \.element) { choiceIndex, choice in
+                                                let choiceLabel = ["A", "B", "C", "D"][choiceIndex]
+                                                HStack(alignment: .center, spacing: 12) {
+                                                    Text(choiceLabel)
+                                                        .font(.headline)
+                                                        .foregroundColor(.blue)
+                                                        .frame(width: 24, height: 24)
+                                                        .background(
+                                                            Circle()
+                                                                .fill(Color.blue.opacity(0.1))
+                                                        )
+                                                    
+                                                    Button(action: {
+                                                        selectedAnswers[question.questionText] = choice
+                                                        showSubmitButton = true
+                                                    }) {
+                                                        HStack {
+                                                            Text(choice)
+                                                                .foregroundColor(.primary)
+                                                                .multilineTextAlignment(.leading)
+                                                            Spacer()
+                                                            if selectedAnswers[question.questionText] == choice {
+                                                                Image(systemName: "checkmark.circle.fill")
+                                                                    .foregroundColor(.blue)
+                                                            }
                                                         }
+                                                        .padding()
+                                                        .background(
+                                                            RoundedRectangle(cornerRadius: 8)
+                                                                .fill(selectedAnswers[question.questionText] == choice ?
+                                                                    Color.blue.opacity(0.1) : Color(.systemGray6))
+                                                                .overlay(
+                                                                    RoundedRectangle(cornerRadius: 8)
+                                                                        .stroke(selectedAnswers[question.questionText] == choice ?
+                                                                            Color.blue : Color.clear, lineWidth: 2)
+                                                                )
+                                                        )
                                                     }
-                                                    .padding()
-                                                    .background(
-                                                        RoundedRectangle(cornerRadius: 8)
-                                                            .fill(selectedAnswers[question.questionText] == choice ?
-                                                                Color.blue.opacity(0.1) : Color(.systemGray6))
-                                                            .overlay(
-                                                                RoundedRectangle(cornerRadius: 8)
-                                                                    .stroke(selectedAnswers[question.questionText] == choice ?
-                                                                        Color.blue : Color.clear, lineWidth: 2)
-                                                            )
-                                                    )
+                                                    .buttonStyle(PlainButtonStyle())
                                                 }
-                                                .buttonStyle(PlainButtonStyle())
                                             }
                                         }
                                         .padding(.horizontal)
@@ -83,8 +106,9 @@ struct QuestionsView: View {
                                     .font(.headline)
                                     .padding(.horizontal)
 
-                                ForEach(viewModel.openEndedQuestions) { question in
+                                ForEach(Array(viewModel.openEndedQuestions.enumerated()), id: \.element.id) { index, question in
                                     OpenEndedQuestionView(
+                                        questionNumber: index + 1,
                                         question: question,
                                         answer: openEndedAnswers[question.questionText] ?? "",
                                         editingAnswer: editingAnswers[question.questionText] ?? "",
@@ -172,6 +196,7 @@ struct QuestionsView: View {
 }
 
 struct OpenEndedQuestionView: View {
+    let questionNumber: Int
     let question: ComprehensionQuestion
     let answer: String
     let editingAnswer: String
@@ -186,14 +211,25 @@ struct OpenEndedQuestionView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(question.questionText)
-                .font(.headline)
-                .padding(.horizontal)
+            HStack(alignment: .top, spacing: 12) {
+                Text("\(questionNumber)")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .frame(width: 32, height: 32)
+                    .background(
+                        Circle()
+                            .fill(Color.blue)
+                    )
+                
+                Text(question.questionText)
+                    .font(.headline)
+            }
             
             VStack(spacing: 8) {
                 // Answer display/editing area
-                VStack(alignment: .leading, spacing: 8) {
-                    if !editingAnswer.isEmpty {
+                if !editingAnswer.isEmpty || isRecording {
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("Your Answer:")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
@@ -207,71 +243,57 @@ struct OpenEndedQuestionView: View {
                         .background(Color(.systemGray6))
                         .cornerRadius(8)
                         .disabled(isLocked)
-                    }
-                    
-                    // Recording status
-                    if isRecording {
-                        HStack {
-                            Image(systemName: "mic.fill")
-                                .foregroundColor(.red)
-                                .scaleEffect(1.2)
-                            Text("Recording... \(transcribedText)")
-                                .foregroundColor(.secondary)
-                            Spacer()
-                        }
-                        .padding(.horizontal)
-                    }
-                }
-                
-                // Action buttons
-                HStack(spacing: 12) {
-                    // Record/Stop button
-                    Button(action: {
+                        
+                        // Recording status
                         if isRecording {
-                            onStopRecording()
-                        } else {
-                            onStartRecording()
-                        }
-                    }) {
-                        HStack {
-                            Image(systemName: isRecording ? "stop.fill" : "mic.fill")
-                            Text(isRecording ? "Stop Recording" : "Record Answer")
-                        }
-                        .foregroundColor(isRecording ? .red : .blue)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(isRecording ? Color.red : Color.blue, lineWidth: 1)
-                        )
-                    }
-                    .disabled(isLocked)
-                    
-                    // Re-record button
-                    if !editingAnswer.isEmpty && !isRecording {
-                        Button(action: {
-                            onAnswerChanged("")
-                            onStartRecording()
-                        }) {
                             HStack {
-                                Image(systemName: "arrow.clockwise")
-                                Text("Re-record")
+                                Image(systemName: "mic.fill")
+                                    .foregroundColor(.red)
+                                    .scaleEffect(1.2)
+                                Text("Recording... \(transcribedText)")
+                                    .foregroundColor(.secondary)
+                                Spacer()
                             }
-                            .foregroundColor(.orange)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.orange, lineWidth: 1)
-                            )
                         }
-                        .disabled(isLocked)
                     }
-                    
-                    Spacer()
-                    
-                    // Lock/Unlock button
-                    if !editingAnswer.isEmpty {
+                    // Action buttons: Stop/Re-record & Lock/Unlock side by side
+                    HStack(spacing: 12) {
+                        if isRecording {
+                            Button(action: {
+                                onStopRecording()
+                            }) {
+                                HStack {
+                                    Image(systemName: "stop.fill")
+                                    Text("Stop")
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.red)
+                                )
+                            }
+                        } else {
+                            Button(action: {
+                                onAnswerChanged("")
+                                onStartRecording()
+                            }) {
+                                HStack {
+                                    Image(systemName: "arrow.clockwise")
+                                    Text("Re-record")
+                                }
+                                .foregroundColor(.orange)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.orange, lineWidth: 1)
+                                )
+                            }
+                            .disabled(isLocked)
+                        }
+                        
                         Button(action: {
                             if isLocked {
                                 onUnlockAnswer()
@@ -284,7 +306,7 @@ struct OpenEndedQuestionView: View {
                                 Text(isLocked ? "Unlock" : "Lock")
                             }
                             .foregroundColor(isLocked ? .green : .blue)
-                            .padding(.horizontal, 16)
+                            .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
@@ -292,15 +314,32 @@ struct OpenEndedQuestionView: View {
                             )
                         }
                     }
+                    .frame(maxWidth: .infinity)
+                } else if !isRecording {
+                    // Only show Record Answer button if not recording and no answer
+                    Button(action: {
+                        onStartRecording()
+                    }) {
+                        HStack {
+                            Image(systemName: "mic.fill")
+                            Text("Record Answer")
+                        }
+                        .foregroundColor(.blue)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.blue, lineWidth: 1)
+                        )
+                    }
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(.horizontal)
             }
         }
         .padding()
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
-        .padding(.horizontal)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(isLocked ? Color.green : Color.clear, lineWidth: 2)
