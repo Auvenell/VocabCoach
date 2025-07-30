@@ -59,9 +59,7 @@ enum WordClassifier {
         let tagger = NLTagger(tagSchemes: [.lexicalClass])
         tagger.string = cleanWord
         var result = false
-        var foundTag: NLTag? = nil
         tagger.enumerateTags(in: cleanWord.startIndex ..< cleanWord.endIndex, unit: .word, scheme: .lexicalClass) { tag, _ in
-            foundTag = tag
             if let tag = tag {
                 result = importantWordTypes.contains(tag)
             }
@@ -128,7 +126,6 @@ struct ReadingSession {
         guard currentWordIndex < paragraph.words.count else { return false }
 
         let expectedWordRaw = paragraph.words[currentWordIndex]
-        let expectedWord = expectedWordRaw.lowercased().trimmingCharacters(in: .punctuationCharacters)
 
         // Debug logging
 

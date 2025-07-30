@@ -336,7 +336,6 @@ struct PracticeView: View {
 
         // HYBRID SCROLL: only scroll if currentWordIndex > buffer, and scroll to currentWordIndex - buffer
         let buffer = 5
-        let totalWords = session.paragraph.words.count
         let targetIndex: Int
         if session.currentWordIndex > buffer {
             targetIndex = session.currentWordIndex - buffer
@@ -348,8 +347,8 @@ struct PracticeView: View {
             scrollTargetIndex = 0
         }
 
-        if let currentWord = session.currentWord {
-            let currentAnalysis = session.wordAnalyses.first { $0.expectedIndex == session.currentWordIndex }
+        if session.currentWord != nil {
+            // Current word exists but no specific analysis needed here
 
         } else if session.isCompleted {
             // All words completed - stop listening automatically
