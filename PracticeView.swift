@@ -250,11 +250,7 @@ struct PracticeView: View {
                                 }
                                 // Trigger navigation to questions when completed
                                 Button("Continue to Questions") {
-                                    print("[DEBUG] Continue to Questions button tapped")
-                                    print("[DEBUG] selectedParagraph: \(selectedParagraph?.id ?? "nil")")
-                                    print("[DEBUG] showQuestions before: \(showQuestions)")
                                     showQuestions = true
-                                    print("[DEBUG] showQuestions after: \(showQuestions)")
                                 }
                             }
                         }
