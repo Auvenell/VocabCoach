@@ -68,13 +68,14 @@ class WordMatcher {
         return false
     }
     
-    /// Normalize word for comparison (lowercase, remove punctuation, normalize apostrophes)
+    /// Normalize word for comparison (lowercase, remove punctuation, normalize apostrophes, remove diacritics)
     private func normalizeWord(_ word: String) -> String {
         return word.lowercased()
             .trimmingCharacters(in: .punctuationCharacters)
             .replacingOccurrences(of: "’", with: "'") // curly to straight
             .replacingOccurrences(of: "'", with: "'")
             .replacingOccurrences(of: "\"", with: "'")
+            .folding(options: .diacriticInsensitive, locale: nil) // remove diacritics
     }
     
     /// Check if a word is a proper noun (capitalized first letter)
