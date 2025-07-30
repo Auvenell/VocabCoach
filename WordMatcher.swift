@@ -6,6 +6,15 @@ class WordMatcher {
     
     private init() {}
     
+    // Mapping for large number words
+    private let numberWordMap: [String: Int] = [
+        "thousand": 1_000,
+        "million": 1_000_000,
+        "billion": 1_000_000_000,
+        "trillion": 1_000_000_000_000,
+        "quadrillion": 1_000_000_000_000_000
+    ]
+    
     /// Check if two words match, considering homonyms, phonetic similarity, and common speech recognition errors
     func isWordMatch(expected: String, spoken: String) -> Bool {
         let normalizedExpected = normalizeWord(expected)
@@ -21,27 +30,82 @@ class WordMatcher {
             return true
         }
         
-        // 3. Possessive form matching
+        // 3. Number and symbol matching
+        if isNumberSymbolMatch(expected: expected, spoken: normalizedSpoken) {
+            return true
+        }
+        
+        // 4. Possessive form matching
         if isPossessiveMatch(expected: normalizedExpected, spoken: normalizedSpoken) {
             return true
         }
         
-        // 4. Homonym matching
+        // 5. Homonym matching
         if isHomonymMatch(expected: normalizedExpected, spoken: normalizedSpoken) {
             return true
         }
         
-        // 5. Phonetic similarity matching
+        // 6. Phonetic similarity matching
         if isPhoneticallySimilar(expected: normalizedExpected, spoken: normalizedSpoken) {
             return true
         }
         
-        // 6. Common speech recognition error patterns
+        // 7. Common speech recognition error patterns
         if isCommonRecognitionError(expected: normalizedExpected, spoken: normalizedSpoken) {
             return true
         }
         
         return false
+    }
+    
+    /// Check if words match considering numbers and symbols (e.g., "$15" matches "15", "15,000,000,000" matches "15 trillion")
+    private func isNumberSymbolMatch(expected: String, spoken: String) -> Bool {
+        // Remove common symbols from expected word for comparison
+        let symbolsToRemove = ["$", "€", "£", "¥", "₹", "₿", "#", "%", "@", "&"]
+        var cleanExpected = expected
+        for symbol in symbolsToRemove {
+            cleanExpected = cleanExpected.replacingOccurrences(of: symbol, with: "")
+        }
+        
+        // Remove commas from numbers
+        let cleanExpectedNoCommas = cleanExpected.replacingOccurrences(of: ",", with: "")
+        let cleanSpokenNoCommas = spoken.replacingOccurrences(of: ",", with: "")
+        
+        // Check if they're the same after cleaning
+        if cleanExpectedNoCommas.lowercased() == cleanSpokenNoCommas.lowercased() {
+            return true
+        }
+        
+        // Handle large number words using the class property
+        
+        // Try to parse both as numbers
+        if let expectedNumber = parseNumberWithWords(cleanExpectedNoCommas),
+           let spokenNumber = parseNumberWithWords(cleanSpokenNoCommas) {
+            return expectedNumber == spokenNumber
+        }
+        
+        return false
+    }
+    
+    /// Parse a string that may contain number words (e.g., "15 trillion" -> 15_000_000_000_000)
+    private func parseNumberWithWords(_ input: String) -> Int? {
+        let words = input.lowercased().components(separatedBy: .whitespaces)
+        var result = 0
+        var currentNumber = 0
+        
+        for word in words {
+            if let number = Int(word) {
+                currentNumber = number
+            } else if let multiplier = numberWordMap[word] {
+                result += currentNumber * multiplier
+                currentNumber = 0
+            }
+        }
+        
+        // Add any remaining number
+        result += currentNumber
+        
+        return result > 0 ? result : nil
     }
     
     /// Check if a compound word match (e.g., "wine maker" -> "winemaker")
