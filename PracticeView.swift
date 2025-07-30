@@ -14,21 +14,18 @@ struct PracticeView: View {
     @State private var showQuestions = false
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 20) {
                 if let session = currentSession {
                     practiceSessionView(session: session)
                 } else {
                     welcomeView
                 }
-                NavigationLink(
-                    destination: selectedParagraph.map { QuestionsView(articleId: $0.id) },
-                    isActive: $showQuestions
-                ) {
-                    EmptyView()
-                }
             }
             .padding()
+            .navigationDestination(isPresented: $showQuestions) {
+                QuestionsView(articleId: selectedParagraph?.id ?? "")
+            }
             .sheet(isPresented: $showingParagraphSelector) {
                 ParagraphSelectorView(
                     dataManager: dataManager,
@@ -253,7 +250,11 @@ struct PracticeView: View {
                                 }
                                 // Trigger navigation to questions when completed
                                 Button("Continue to Questions") {
+                                    print("[DEBUG] Continue to Questions button tapped")
+                                    print("[DEBUG] selectedParagraph: \(selectedParagraph?.id ?? "nil")")
+                                    print("[DEBUG] showQuestions before: \(showQuestions)")
                                     showQuestions = true
+                                    print("[DEBUG] showQuestions after: \(showQuestions)")
                                 }
                             }
                         }
@@ -324,9 +325,7 @@ struct PracticeView: View {
         let wordCompleted = session.analyzeTranscription(transcription)
 
         // Haptic feedback for correct word
-        print("[DEBUG] wordCompleted: \(wordCompleted)")
         if wordCompleted {
-            print("[DEBUG] Triggering haptic feedback for correct word")
             DispatchQueue.main.async {
                 HapticManager.shared.mediumImpact()
             }

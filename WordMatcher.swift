@@ -148,7 +148,6 @@ class WordMatcher {
         // Check if the word starts with a capital letter (indicating proper noun)
         guard let firstChar = word.first else { return false }
         let result = firstChar.isUppercase
-        print("[WordMatcher] isProperNoun('\(word)') -> \(result)")
         return result
     }
 
