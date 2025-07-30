@@ -81,9 +81,11 @@ struct TappableTextView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(paragraph.title)
-                .font(.headline)
+                .font(.title)
+                .fontWeight(.bold)
                 .foregroundColor(.primary)
-                .padding(.bottom, 4)
+                .multilineTextAlignment(.leading)
+                .padding(.bottom, 12)
 
             FlexibleView(
                 data: Array(paragraph.words.enumerated()),

@@ -29,18 +29,7 @@ struct PracticeView: View {
                 }
             }
             .padding()
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    if let session = currentSession {
-                        Text(session.paragraph.title)
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                    }
-                }
 
-            }
             .sheet(isPresented: $showingParagraphSelector) {
                 ParagraphSelectorView(
                     dataManager: dataManager,
