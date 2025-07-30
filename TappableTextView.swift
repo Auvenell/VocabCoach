@@ -91,7 +91,7 @@ struct TappableTextView: View {
                 data: Array(paragraph.words.enumerated()),
                 spacing: 6,
                 alignment: .leading
-            ) { idx, pair in
+            ) { _, pair in
                 let (offset, word) = pair
                 let analysis = wordAnalyses.first { $0.expectedIndex == offset }
                 return Text(word)
@@ -149,7 +149,7 @@ struct TappableTextView: View {
             return .primary
         }
     }
-    
+
     private func borderColor(for analysis: WordAnalysis?) -> Color {
         guard let analysis = analysis else { return Color.clear }
         if analysis.isCurrentWord {
@@ -189,13 +189,13 @@ struct TranscriptionView: View {
         .cornerRadius(12)
         .shadow(radius: 2)
     }
-    
+
     private var displayWordsView: some View {
         let words = transcribedText.components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }
-        
+
         let displayWords = words.count <= 4 ? words : Array(words.suffix(4))
-        
+
         return HStack(spacing: 8) {
             ForEach(Array(displayWords.enumerated()), id: \.offset) { index, word in
                 let isLastWord = index == displayWords.count - 1

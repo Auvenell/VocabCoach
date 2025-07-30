@@ -12,7 +12,7 @@ import SwiftUI
 // 1. Sidebar with User Profile Section
 struct UserProfileSection: View {
     @EnvironmentObject var userSession: UserSession
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
@@ -21,18 +21,18 @@ struct UserProfileSection: View {
                     Circle()
                         .fill(Color.blue.gradient)
                         .frame(width: 60, height: 60)
-                    
+
                     Text(String(userSession.user?.email?.prefix(1) ?? "U").uppercased())
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
                 }
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text(userSession.user?.email ?? "User")
                         .font(.headline)
                         .lineLimit(1)
-                    
+
                     Text("Premium Member")
                         .font(.caption)
                         .foregroundColor(.blue)
@@ -42,7 +42,7 @@ struct UserProfileSection: View {
                         .cornerRadius(4)
                 }
             }
-            
+
             // Quick Stats
             HStack(spacing: 20) {
                 VStack {
@@ -53,7 +53,7 @@ struct UserProfileSection: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
+
                 VStack {
                     Text("89%")
                         .font(.title2)
@@ -62,7 +62,7 @@ struct UserProfileSection: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
+
                 VStack {
                     Text("14")
                         .font(.title2)
@@ -83,12 +83,12 @@ struct UserProfileSection: View {
 // 2. Sidebar with Search
 struct SidebarSearchBar: View {
     @State private var searchText = ""
-    
+
     var body: some View {
         HStack {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
-            
+
             TextField("Search...", text: $searchText)
                 .textFieldStyle(PlainTextFieldStyle())
         }
@@ -105,7 +105,7 @@ struct SidebarCategory: View {
     let title: String
     let items: [SidebarMenuItemData]
     @Binding var isShowing: Bool
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
@@ -114,7 +114,7 @@ struct SidebarCategory: View {
                 .foregroundColor(.secondary)
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
-            
+
             ForEach(items) { item in
                 SidebarMenuItem(
                     icon: item.icon,
@@ -140,7 +140,7 @@ struct SidebarMenuItemWithBadge: View {
     let isActive: Bool
     var isDestructive: Bool = false
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 16) {
@@ -148,13 +148,13 @@ struct SidebarMenuItemWithBadge: View {
                     .font(.system(size: 18, weight: .medium))
                     .foregroundColor(isDestructive ? .red : (isActive ? .blue : .primary))
                     .frame(width: 24)
-                
+
                 Text(title)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(isDestructive ? .red : .primary)
-                
+
                 Spacer()
-                
+
                 if let badge = badge {
                     Text(badge)
                         .font(.caption2)
@@ -187,7 +187,7 @@ struct SidebarMenuItemData: Identifiable {
     let isDestructive: Bool
     let badge: String?
     let action: () -> Void
-    
+
     init(icon: String, title: String, isActive: Bool = false, isDestructive: Bool = false, badge: String? = nil, action: @escaping () -> Void) {
         self.icon = icon
         self.title = title
@@ -203,21 +203,21 @@ struct EnhancedSidebarView: View {
     @Binding var isShowing: Bool
     @EnvironmentObject var userSession: UserSession
     @State private var searchText = ""
-    
+
     private let mainMenuItems = [
         SidebarMenuItemData(icon: "book.fill", title: "Practice", isActive: true) {},
         SidebarMenuItemData(icon: "chart.bar.fill", title: "Progress") {},
         SidebarMenuItemData(icon: "trophy.fill", title: "Achievements", badge: "3") {},
-        SidebarMenuItemData(icon: "star.fill", title: "Favorites") {}
+        SidebarMenuItemData(icon: "star.fill", title: "Favorites") {},
     ]
-    
+
     private let settingsItems = [
         SidebarMenuItemData(icon: "gear", title: "Settings") {},
         SidebarMenuItemData(icon: "bell", title: "Notifications", badge: "2") {},
         SidebarMenuItemData(icon: "questionmark.circle", title: "Help") {},
-        SidebarMenuItemData(icon: "envelope", title: "Feedback") {}
+        SidebarMenuItemData(icon: "envelope", title: "Feedback") {},
     ]
-    
+
     var body: some View {
         ZStack {
             // Background overlay
@@ -231,39 +231,39 @@ struct EnhancedSidebarView: View {
                         }
                     }
             }
-            
+
             // Sidebar content
             HStack {
                 VStack(alignment: .leading, spacing: 0) {
                     // User Profile Section
                     UserProfileSection()
                         .padding(.top, 20)
-                    
+
                     // Search Bar
                     SidebarSearchBar()
                         .padding(.top, 16)
-                    
+
                     // Main Menu
                     SidebarCategory(
                         title: "MAIN",
                         items: mainMenuItems,
                         isShowing: $isShowing
                     )
-                    
+
                     // Settings Menu
                     SidebarCategory(
                         title: "SETTINGS",
                         items: settingsItems,
                         isShowing: $isShowing
                     )
-                    
+
                     Spacer()
-                    
+
                     // Logout
                     VStack(spacing: 0) {
                         Divider()
                             .padding(.horizontal, 20)
-                        
+
                         SidebarMenuItem(
                             icon: "rectangle.portrait.and.arrow.right",
                             title: "Log Out",
@@ -281,7 +281,7 @@ struct EnhancedSidebarView: View {
                 .frame(width: 300)
                 .background(Color(.systemBackground))
                 .offset(x: isShowing ? 0 : -300)
-                
+
                 Spacer()
             }
         }
@@ -299,4 +299,4 @@ struct EnhancedSidebarView: View {
         // Select text action
     }
     .environmentObject(UserSession())
-} 
+}

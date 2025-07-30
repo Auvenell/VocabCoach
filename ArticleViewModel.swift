@@ -1,5 +1,5 @@
-import Foundation
 import FirebaseFirestore
+import Foundation
 
 struct Article: Identifiable {
     var id: String
@@ -31,7 +31,7 @@ class ArticleViewModel: ObservableObject {
     private var db = Firestore.firestore()
 
     func fetchArticles() {
-        db.collection("articles").getDocuments { snapshot, error in
+        db.collection("articles").getDocuments { snapshot, _ in
             guard let documents = snapshot?.documents else { return }
             self.articles = documents.compactMap { doc in
                 let data = doc.data()
@@ -47,7 +47,7 @@ class ArticleViewModel: ObservableObject {
     }
 
     func fetchQuestions(for articleId: String) {
-        db.collection("articles").document(articleId).getDocument { snapshot, error in
+        db.collection("articles").document(articleId).getDocument { snapshot, _ in
             guard let data = snapshot?.data() else { return }
             // Open-ended questions
             if let questionsArray = data["questions"] as? [[String: Any]] {
@@ -81,4 +81,4 @@ class ArticleViewModel: ObservableObject {
             }
         }
     }
-} 
+}

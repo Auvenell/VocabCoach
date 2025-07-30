@@ -11,7 +11,7 @@ struct ContentView: View {
     @EnvironmentObject var userSession: UserSession
     @State private var isSidebarShowing = false
     @State private var showingParagraphSelector = false
-    
+
     var body: some View {
         ZStack {
             // Main content
@@ -30,15 +30,15 @@ struct ContentView: View {
                             .background(Color(.systemGray6))
                             .clipShape(Circle())
                     }
-                    
+
                     Spacer()
-                    
+
                     Text("Vocab Coach")
                         .font(.title2)
                         .fontWeight(.semibold)
-                    
+
                     Spacer()
-                    
+
                     // Placeholder to balance the layout
                     Circle()
                         .fill(Color.clear)
@@ -46,13 +46,13 @@ struct ContentView: View {
                 }
                 .padding(.horizontal)
                 .padding(.top, 8)
-                
+
                 // Main content area
                 PracticeView(showingParagraphSelector: $showingParagraphSelector)
-                
+
                 Spacer()
             }
-            
+
             // Sidebar overlay
             SidebarView(isShowing: $isSidebarShowing) {
                 showingParagraphSelector = true

@@ -1,5 +1,5 @@
-import SwiftUI
 import FirebaseFirestore
+import SwiftUI
 
 struct QuestionsView: View {
     let articleId: String

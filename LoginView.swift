@@ -5,7 +5,7 @@ struct LoginView: View {
     @State private var email: String = ""
     @State private var password: String = ""
     @State private var isRegistering: Bool = false
-    
+
     var body: some View {
         VStack(spacing: 24) {
             Text(isRegistering ? "Register" : "Sign In")
@@ -51,4 +51,4 @@ struct LoginView: View {
         }
         .padding()
     }
-} 
+}

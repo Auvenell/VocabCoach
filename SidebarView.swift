@@ -11,7 +11,7 @@ struct SidebarView: View {
     @Binding var isShowing: Bool
     @EnvironmentObject var userSession: UserSession
     var onSelectText: (() -> Void)?
-    
+
     var body: some View {
         ZStack {
             // Background overlay
@@ -25,7 +25,7 @@ struct SidebarView: View {
                         }
                     }
             }
-            
+
             // Sidebar content
             HStack {
                 VStack(alignment: .leading, spacing: 0) {
@@ -35,12 +35,12 @@ struct SidebarView: View {
                             Image(systemName: "person.circle.fill")
                                 .font(.system(size: 50))
                                 .foregroundColor(.blue)
-                            
+
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(userSession.user?.email ?? "User")
                                     .font(.headline)
                                     .foregroundColor(.primary)
-                                
+
                                 Text("Vocab Coach")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
@@ -48,11 +48,11 @@ struct SidebarView: View {
                         }
                         .padding(.horizontal, 20)
                         .padding(.top, 20)
-                        
+
                         Divider()
                             .padding(.horizontal, 20)
                     }
-                    
+
                     // Menu Items
                     VStack(spacing: 0) {
                         SidebarMenuItem(
@@ -65,7 +65,7 @@ struct SidebarView: View {
                                 isShowing = false
                             }
                         }
-                        
+
                         SidebarMenuItem(
                             icon: "doc.text",
                             title: "Select Text",
@@ -76,7 +76,7 @@ struct SidebarView: View {
                                 isShowing = false
                             }
                         }
-                        
+
                         SidebarMenuItem(
                             icon: "chart.bar.fill",
                             title: "Progress",
@@ -87,7 +87,7 @@ struct SidebarView: View {
                                 isShowing = false
                             }
                         }
-                        
+
                         SidebarMenuItem(
                             icon: "gear",
                             title: "Settings",
@@ -98,7 +98,7 @@ struct SidebarView: View {
                                 isShowing = false
                             }
                         }
-                        
+
                         SidebarMenuItem(
                             icon: "questionmark.circle",
                             title: "Help",
@@ -110,14 +110,14 @@ struct SidebarView: View {
                             }
                         }
                     }
-                    
+
                     Spacer()
-                    
+
                     // Logout button
                     VStack(spacing: 0) {
                         Divider()
                             .padding(.horizontal, 20)
-                        
+
                         SidebarMenuItem(
                             icon: "rectangle.portrait.and.arrow.right",
                             title: "Log Out",
@@ -135,7 +135,7 @@ struct SidebarView: View {
                 .frame(width: 280)
                 .background(Color(.systemBackground))
                 .offset(x: isShowing ? 0 : -280)
-                
+
                 Spacer()
             }
         }
@@ -149,7 +149,7 @@ struct SidebarMenuItem: View {
     let isActive: Bool
     var isDestructive: Bool = false
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 16) {
@@ -157,11 +157,11 @@ struct SidebarMenuItem: View {
                     .font(.system(size: 18, weight: .medium))
                     .foregroundColor(isDestructive ? .red : (isActive ? .blue : .primary))
                     .frame(width: 24)
-                
+
                 Text(title)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(isDestructive ? .red : .primary)
-                
+
                 Spacer()
             }
             .padding(.horizontal, 20)
@@ -181,4 +181,4 @@ struct SidebarMenuItem: View {
         // Select text action
     }
     .environmentObject(UserSession())
-} 
+}

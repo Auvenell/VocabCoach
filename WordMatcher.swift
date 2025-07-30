@@ -3,61 +3,61 @@ import Foundation
 /// Comprehensive word matching system that handles homonyms, phonetic similarity, and common speech recognition errors
 class WordMatcher {
     static let shared = WordMatcher()
-    
+
     private init() {}
-    
+
     // Mapping for large number words
     private let numberWordMap: [String: Int] = [
-        "thousand": 1_000,
+        "thousand": 1000,
         "million": 1_000_000,
         "billion": 1_000_000_000,
         "trillion": 1_000_000_000_000,
-        "quadrillion": 1_000_000_000_000_000
+        "quadrillion": 1_000_000_000_000_000,
     ]
-    
+
     /// Check if two words match, considering homonyms, phonetic similarity, and common speech recognition errors
     func isWordMatch(expected: String, spoken: String) -> Bool {
         let normalizedExpected = normalizeWord(expected)
         let normalizedSpoken = normalizeWord(spoken)
-        
+
         // 1. Exact match (case-insensitive, punctuation-ignored)
         if normalizedSpoken == normalizedExpected {
             return true
         }
-        
+
         // 2. Proper noun matching (more permissive for company names, etc.)
         if isProperNounMatch(expected: expected, spoken: normalizedSpoken) {
             return true
         }
-        
+
         // 3. Number and symbol matching
         if isNumberSymbolMatch(expected: expected, spoken: normalizedSpoken) {
             return true
         }
-        
+
         // 4. Possessive form matching
         if isPossessiveMatch(expected: normalizedExpected, spoken: normalizedSpoken) {
             return true
         }
-        
+
         // 5. Homonym matching
         if isHomonymMatch(expected: normalizedExpected, spoken: normalizedSpoken) {
             return true
         }
-        
+
         // 6. Phonetic similarity matching
         if isPhoneticallySimilar(expected: normalizedExpected, spoken: normalizedSpoken) {
             return true
         }
-        
+
         // 7. Common speech recognition error patterns
         if isCommonRecognitionError(expected: normalizedExpected, spoken: normalizedSpoken) {
             return true
         }
-        
+
         return false
     }
-    
+
     /// Check if words match considering numbers and symbols (e.g., "$15" matches "15", "15,000,000,000" matches "15 trillion")
     private func isNumberSymbolMatch(expected: String, spoken: String) -> Bool {
         // Remove common symbols from expected word for comparison
@@ -66,33 +66,34 @@ class WordMatcher {
         for symbol in symbolsToRemove {
             cleanExpected = cleanExpected.replacingOccurrences(of: symbol, with: "")
         }
-        
+
         // Remove commas from numbers
         let cleanExpectedNoCommas = cleanExpected.replacingOccurrences(of: ",", with: "")
         let cleanSpokenNoCommas = spoken.replacingOccurrences(of: ",", with: "")
-        
+
         // Check if they're the same after cleaning
         if cleanExpectedNoCommas.lowercased() == cleanSpokenNoCommas.lowercased() {
             return true
         }
-        
+
         // Handle large number words using the class property
-        
+
         // Try to parse both as numbers
         if let expectedNumber = parseNumberWithWords(cleanExpectedNoCommas),
-           let spokenNumber = parseNumberWithWords(cleanSpokenNoCommas) {
+           let spokenNumber = parseNumberWithWords(cleanSpokenNoCommas)
+        {
             return expectedNumber == spokenNumber
         }
-        
+
         return false
     }
-    
+
     /// Parse a string that may contain number words (e.g., "15 trillion" -> 15_000_000_000_000)
     private func parseNumberWithWords(_ input: String) -> Int? {
         let words = input.lowercased().components(separatedBy: .whitespaces)
         var result = 0
         var currentNumber = 0
-        
+
         for word in words {
             if let number = Int(word) {
                 currentNumber = number
@@ -101,37 +102,37 @@ class WordMatcher {
                 currentNumber = 0
             }
         }
-        
+
         // Add any remaining number
         result += currentNumber
-        
+
         return result > 0 ? result : nil
     }
-    
+
     /// Check if a compound word match (e.g., "wine maker" -> "winemaker")
     func isCompoundWordMatch(expected: String, lastTwoSpoken: [String]) -> Bool {
         guard lastTwoSpoken.count >= 2 else { return false }
-        
+
         let normalizedExpected = normalizeWord(expected)
         let concatenated = lastTwoSpoken.suffix(2).joined().lowercased()
         let normalizedConcatenated = normalizeWord(concatenated)
-        
+
         // Check if concatenated words match the expected word
         if normalizedConcatenated == normalizedExpected {
             return true
         }
-        
+
         // Also check with a hyphen (common compound format)
         let hyphenated = lastTwoSpoken.suffix(2).joined(separator: "-").lowercased()
         let normalizedHyphenated = normalizeWord(hyphenated)
-        
+
         if normalizedHyphenated == normalizedExpected {
             return true
         }
-        
+
         return false
     }
-    
+
     /// Normalize word for comparison (lowercase, remove punctuation, normalize apostrophes, remove diacritics)
     private func normalizeWord(_ word: String) -> String {
         return word.lowercased()
@@ -141,7 +142,7 @@ class WordMatcher {
             .replacingOccurrences(of: "\"", with: "'")
             .folding(options: .diacriticInsensitive, locale: nil) // remove diacritics
     }
-    
+
     /// Check if a word is a proper noun (capitalized first letter)
     func isProperNoun(_ word: String) -> Bool {
         // Check if the word starts with a capital letter (indicating proper noun)
@@ -150,7 +151,7 @@ class WordMatcher {
         print("[WordMatcher] isProperNoun('\(word)') -> \(result)")
         return result
     }
-    
+
     /// Check if words are proper nouns (company names, etc.) - always pass if something is said
     private func isProperNounMatch(expected: String, spoken: String) -> Bool {
         // Check if the expected word is a known proper noun
@@ -158,14 +159,14 @@ class WordMatcher {
             // For proper nouns, always pass if something was said (not empty)
             return !spoken.isEmpty
         }
-        
+
         return false
     }
-    
+
     /// Check if words are possessive forms of each other
     private func isPossessiveMatch(expected: String, spoken: String) -> Bool {
         // Handle cases like "industry's" vs "industries"
-        
+
         // Case 1: Expected is possessive, spoken is plural
         if expected.hasSuffix("'s") {
             let baseWord = String(expected.dropLast(2)) // Remove "'s"
@@ -180,7 +181,7 @@ class WordMatcher {
                 }
             }
         }
-        
+
         // Case 2: Expected is plural, spoken is possessive
         if expected.hasSuffix("s") && !expected.hasSuffix("'s") {
             if spoken == expected + "'s" {
@@ -194,7 +195,7 @@ class WordMatcher {
                 }
             }
         }
-        
+
         // Case 3: Handle irregular plurals that might be confused with possessives
         let irregularPossessives: [(String, String)] = [
             ("children's", "children"),
@@ -282,18 +283,18 @@ class WordMatcher {
             ("it's", "it"),
             ("we've", "we"),
             ("they've", "they"),
-            ("you've", "you")
+            ("you've", "you"),
         ]
-        
+
         for (possessive, base) in irregularPossessives {
             if (expected == possessive && spoken == base) || (expected == base && spoken == possessive) {
                 return true
             }
         }
-        
+
         return false
     }
-    
+
     /// Check if words are homonyms (sound the same but spelled differently)
     private func isHomonymMatch(expected: String, spoken: String) -> Bool {
         let homonymGroups: [[String]] = [
@@ -395,18 +396,18 @@ class WordMatcher {
             ["which", "witch"],
             ["wood", "would"],
             ["wring", "ring"],
-            ["write", "right", "rite"]
+            ["write", "right", "rite"],
         ]
-        
+
         for group in homonymGroups {
             if group.contains(expected) && group.contains(spoken) {
                 return true
             }
         }
-        
+
         return false
     }
-    
+
     /// Check if words are phonetically similar using simple heuristics
     private func isPhoneticallySimilar(expected: String, spoken: String) -> Bool {
         // If words are very similar in length and have high character overlap
@@ -418,42 +419,43 @@ class WordMatcher {
                 return true
             }
         }
-        
+
         // Common phonetic substitutions
         let phoneticSubstitutions: [(String, String)] = [
-            ("th", "f"), ("th", "v"),  // "think" vs "fink"
-            ("w", "v"), ("v", "w"),    // "very" vs "wery"
-            ("l", "r"), ("r", "l"),    // "light" vs "right"
-            ("s", "z"), ("z", "s"),    // "zoo" vs "soo"
-            ("f", "v"), ("v", "f"),    // "very" vs "fery"
-            ("p", "b"), ("b", "p"),    // "pat" vs "bat"
-            ("t", "d"), ("d", "t"),    // "time" vs "dime"
-            ("k", "g"), ("g", "k"),    // "cat" vs "gat"
-            ("sh", "s"), ("s", "sh"),  // "ship" vs "sip"
-            ("ch", "t"), ("t", "ch"),  // "chair" vs "tair"
-            ("j", "d"), ("d", "j"),    // "jump" vs "dump"
-            ("ng", "n"), ("n", "ng"),  // "sing" vs "sin"
-            ("m", "n"), ("n", "m"),    // "man" vs "nan"
-            ("w", "h"), ("h", "w"),    // "what" vs "wat"
-            ("y", "i"), ("i", "y"),    // "yes" vs "ies"
-            ("u", "oo"), ("oo", "u"),  // "put" vs "poot"
-            ("a", "ah"), ("ah", "a"),  // "cat" vs "caht"
-            ("e", "ee"), ("ee", "e"),  // "bed" vs "beed"
-            ("i", "ee"), ("ee", "i"),  // "sit" vs "seet"
-            ("o", "oh"), ("oh", "o"),  // "hot" vs "hoht"
-            ("u", "you"), ("you", "u") // "use" vs "youse"
+            ("th", "f"), ("th", "v"), // "think" vs "fink"
+            ("w", "v"), ("v", "w"), // "very" vs "wery"
+            ("l", "r"), ("r", "l"), // "light" vs "right"
+            ("s", "z"), ("z", "s"), // "zoo" vs "soo"
+            ("f", "v"), ("v", "f"), // "very" vs "fery"
+            ("p", "b"), ("b", "p"), // "pat" vs "bat"
+            ("t", "d"), ("d", "t"), // "time" vs "dime"
+            ("k", "g"), ("g", "k"), // "cat" vs "gat"
+            ("sh", "s"), ("s", "sh"), // "ship" vs "sip"
+            ("ch", "t"), ("t", "ch"), // "chair" vs "tair"
+            ("j", "d"), ("d", "j"), // "jump" vs "dump"
+            ("ng", "n"), ("n", "ng"), // "sing" vs "sin"
+            ("m", "n"), ("n", "m"), // "man" vs "nan"
+            ("w", "h"), ("h", "w"), // "what" vs "wat"
+            ("y", "i"), ("i", "y"), // "yes" vs "ies"
+            ("u", "oo"), ("oo", "u"), // "put" vs "poot"
+            ("a", "ah"), ("ah", "a"), // "cat" vs "caht"
+            ("e", "ee"), ("ee", "e"), // "bed" vs "beed"
+            ("i", "ee"), ("ee", "i"), // "sit" vs "seet"
+            ("o", "oh"), ("oh", "o"), // "hot" vs "hoht"
+            ("u", "you"), ("you", "u"), // "use" vs "youse"
         ]
-        
+
         for (sub1, sub2) in phoneticSubstitutions {
             if expected.replacingOccurrences(of: sub1, with: sub2) == spoken ||
-               spoken.replacingOccurrences(of: sub1, with: sub2) == expected {
+                spoken.replacingOccurrences(of: sub1, with: sub2) == expected
+            {
                 return true
             }
         }
-        
+
         return false
     }
-    
+
     /// Check for common speech recognition error patterns
     private func isCommonRecognitionError(expected: String, spoken: String) -> Bool {
         let commonErrors: [(String, String)] = [
@@ -516,15 +518,15 @@ class WordMatcher {
             ("she'd", "shed"), ("shed", "she'd"),
             ("we'd", "wed"), ("wed", "we'd"),
             ("they'd", "theyd"), ("theyd", "they'd"),
-            ("you'd", "youd"), ("youd", "you'd")
+            ("you'd", "youd"), ("youd", "you'd"),
         ]
-        
+
         for (error, correct) in commonErrors {
             if expected == correct && spoken == error {
                 return true
             }
         }
-        
+
         return false
     }
-} 
+}

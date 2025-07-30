@@ -4,7 +4,7 @@ struct PracticeView: View {
     @StateObject private var speechManager = SpeechRecognitionManager()
     @StateObject private var ttsManager = TextToSpeechManager()
     @StateObject private var dataManager = ParagraphDataManager()
-    
+
     @State private var currentSession: ReadingSession?
     @State private var selectedParagraph: PracticeParagraph?
     @Binding var showingParagraphSelector: Bool
@@ -12,7 +12,7 @@ struct PracticeView: View {
     @State private var feedbackMessage = ""
     @State private var scrollTargetIndex: Int? = nil
     @State private var showQuestions = false
-    
+
     var body: some View {
         NavigationView {
             VStack(spacing: 20) {
@@ -29,7 +29,6 @@ struct PracticeView: View {
                 }
             }
             .padding()
-
             .sheet(isPresented: $showingParagraphSelector) {
                 ParagraphSelectorView(
                     dataManager: dataManager,
@@ -55,23 +54,23 @@ struct PracticeView: View {
             }
         }
     }
-    
+
     private var welcomeView: some View {
         VStack(spacing: 30) {
             Image(systemName: "mic.circle.fill")
                 .font(.system(size: 80))
                 .foregroundColor(.blue)
-            
+
             Text("Welcome to Vocab Coach")
                 .font(.largeTitle)
                 .fontWeight(.bold)
-            
+
             Text("Improve your English pronunciation and fluency by reading aloud and getting real-time feedback.")
                 .font(.body)
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
                 .padding(.horizontal)
-            
+
             Button(action: {
                 showingParagraphSelector = true
             }) {
@@ -86,7 +85,7 @@ struct PracticeView: View {
             .padding(.horizontal)
         }
     }
-    
+
     @ViewBuilder
     private func practiceSessionView(session: ReadingSession) -> some View {
         ScrollViewReader { scrollProxy in
@@ -109,12 +108,12 @@ struct PracticeView: View {
                         }
                     }
                 }
-            
+
                 // Transcription view
                 TranscriptionView(
                     transcribedText: speechManager.transcribedText
                 )
-                
+
                 // Control buttons
                 VStack(spacing: 12) {
                     // Start/Stop Reading button (prominent)
@@ -146,7 +145,7 @@ struct PracticeView: View {
                     }
                     .accessibilityLabel(speechManager.isListening ? "Stop Listening" : "Start Reading")
                     .disabled(session.isCompleted)
-                    
+
                     // Reset button - changes behavior based on completion state
                     Button(action: {
                         if session.isCompleted {
@@ -189,7 +188,7 @@ struct PracticeView: View {
                     }
                 }
                 .padding(.top, 16)
-                
+
                 // Progress indicator
                 if session.totalWords > 0 {
                     VStack(spacing: 8) {
@@ -202,11 +201,11 @@ struct PracticeView: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
-                        
+
                         ProgressView(value: session.accuracy)
                             .progressViewStyle(LinearProgressViewStyle())
                             .accentColor(session.accuracy > 0.8 ? .green : session.accuracy > 0.6 ? .orange : .red)
-                        
+
                         // Current word indicator
                         if let currentWord = session.currentWord {
                             HStack {
@@ -231,13 +230,13 @@ struct PracticeView: View {
                                         .foregroundColor(.green)
                                     Spacer()
                                 }
-                                
+
                                 let reviewWords = session.wordsToReview
                                 if !reviewWords.isEmpty {
                                     Text("Words to practice:")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
-                                    
+
                                     ScrollView {
                                         VStack(alignment: .leading, spacing: 4) {
                                             ForEach(reviewWords, id: \.self) { word in
@@ -263,26 +262,26 @@ struct PracticeView: View {
                     .background(Color(.systemGray6))
                     .cornerRadius(8)
                 }
-                
+
                 Spacer()
             }
         }
     }
-    
+
     private func startNewSession(with paragraph: PracticeParagraph) {
         currentSession = ReadingSession(paragraph: paragraph)
         speechManager.reset()
         ttsManager.stopSpeaking()
         scrollTargetIndex = 0
     }
-    
+
     private func startPractice() {
         guard var session = currentSession else { return }
-        
+
         session.startTime = Date()
         currentSession = session
         speechManager.startListening()
-        
+
         // Provide initial feedback
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             if let currentWord = session.currentWord {
@@ -292,18 +291,18 @@ struct PracticeView: View {
             }
         }
     }
-    
+
     private func stopPractice() {
         guard var session = currentSession else { return }
-        
+
         session.endTime = Date()
         speechManager.stopListening()
         currentSession = session
-        
+
         // Provide final feedback
         let accuracy = session.accuracy
         let feedback: String
-        
+
         if accuracy >= 0.9 {
             feedback = "Excellent reading! Your pronunciation was very accurate."
         } else if accuracy >= 0.7 {
@@ -313,17 +312,17 @@ struct PracticeView: View {
         } else {
             feedback = "Don't worry, pronunciation takes time. Try reading more slowly and clearly."
         }
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             ttsManager.speakFeedback(feedback)
         }
     }
-    
+
     private func updateSession(with transcription: String) {
         guard var session = currentSession else { return }
         let previousWordIndex = session.currentWordIndex
         let wordCompleted = session.analyzeTranscription(transcription)
-        
+
         // Haptic feedback for correct word
         print("[DEBUG] wordCompleted: \(wordCompleted)")
         if wordCompleted {
@@ -332,9 +331,9 @@ struct PracticeView: View {
                 HapticManager.shared.mediumImpact()
             }
         }
-        
+
         currentSession = session
-        
+
         // HYBRID SCROLL: only scroll if currentWordIndex > buffer, and scroll to currentWordIndex - buffer
         let buffer = 5
         let totalWords = session.paragraph.words.count
@@ -348,16 +347,16 @@ struct PracticeView: View {
         if previousWordIndex > session.currentWordIndex { // reset or rewind
             scrollTargetIndex = 0
         }
-        
+
         if let currentWord = session.currentWord {
             let currentAnalysis = session.wordAnalyses.first { $0.expectedIndex == session.currentWordIndex }
-            
+
         } else if session.isCompleted {
             // All words completed - stop listening automatically
             speechManager.stopListening()
-            
+
             let reviewWords = session.wordsToReview
-            
+
             if reviewWords.isEmpty {
                 feedbackMessage = "Excellent! You've completed the paragraph perfectly!"
             } else {
@@ -368,63 +367,63 @@ struct PracticeView: View {
             if let sessionParagraph = currentSession?.paragraph {
                 selectedParagraph = sessionParagraph
             }
-        } 
+        }
     }
-    
+
     private func handleWordTap(_ word: String) {
         DispatchQueue.main.async {
             HapticManager.shared.mediumImpact()
         }
         ttsManager.speakWord(word)
     }
-    
+
     private func resetSession() {
         guard let paragraph = currentSession?.paragraph else { return }
-        
+
         // Stop listening and clear speech recognition
         speechManager.stopListening()
         speechManager.clearTranscription()
-        
+
         // Stop any ongoing text-to-speech
         ttsManager.stopSpeaking()
-        
+
         // Clear feedback message
         feedbackMessage = ""
-        
+
         // Start a completely fresh session
         startNewSession(with: paragraph)
-        
+
         // Provide feedback about the reset
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             ttsManager.speakFeedback("Starting over. Begin reading the paragraph aloud.")
         }
         scrollTargetIndex = 0
     }
-    
+
     private func resetToSentenceStart() {
-        guard var session = currentSession else { 
-            return 
+        guard var session = currentSession else {
+            return
         }
-        
+
         // Stop listening temporarily to clear any buffered audio
         let wasListening = speechManager.isListening
         if wasListening {
             speechManager.stopListening()
         }
-        
+
         session.resetToSentenceStart()
         currentSession = session
-        
+
         // Clear transcription completely
         speechManager.clearTranscription()
-        
+
         // Restart listening if it was on before
         if wasListening {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 speechManager.startListening()
             }
         }
-        
+
         // Provide feedback about the reset
         if let currentWord = session.currentWord {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -433,7 +432,7 @@ struct PracticeView: View {
         }
         scrollTargetIndex = 0
     }
-    
+
     private func skipCurrentWord() {
         guard var session = currentSession, !session.isCompleted, session.currentWord != nil else { return }
         session.skipCurrentWord()
@@ -447,17 +446,16 @@ struct PracticeView: View {
         let targetIndex = session.currentWordIndex > buffer ? session.currentWordIndex - buffer : 0
         scrollTargetIndex = targetIndex
     }
-
 }
 
 struct ParagraphSelectorView: View {
     @ObservedObject var dataManager: ParagraphDataManager
     @Binding var selectedParagraph: PracticeParagraph?
     let onParagraphSelected: (PracticeParagraph) -> Void
-    
+
     @State private var selectedDifficulty: PracticeParagraph.Difficulty?
     @State private var selectedCategory: PracticeParagraph.Category?
-    
+
     var body: some View {
         NavigationView {
             VStack {
@@ -475,7 +473,7 @@ struct ParagraphSelectorView: View {
                         }
                         .pickerStyle(MenuPickerStyle())
                     }
-                    
+
                     HStack {
                         Text("Category:")
                             .font(.headline)
@@ -492,19 +490,19 @@ struct ParagraphSelectorView: View {
                 .padding()
                 .background(Color(.systemGray6))
                 .cornerRadius(12)
-                
+
                 // Paragraph list
                 List {
                     ForEach(filteredParagraphs) { paragraph in
                         VStack(alignment: .leading, spacing: 8) {
                             Text(paragraph.title)
                                 .font(.headline)
-                            
+
                             Text(paragraph.text)
                                 .font(.body)
                                 .foregroundColor(.secondary)
                                 .lineLimit(3)
-                            
+
                             HStack {
                                 Text(paragraph.difficulty.rawValue)
                                     .font(.caption)
@@ -513,7 +511,7 @@ struct ParagraphSelectorView: View {
                                     .background(difficultyColor(for: paragraph.difficulty))
                                     .foregroundColor(.white)
                                     .cornerRadius(8)
-                                
+
                                 Text(paragraph.category.rawValue)
                                     .font(.caption)
                                     .padding(.horizontal, 8)
@@ -521,9 +519,9 @@ struct ParagraphSelectorView: View {
                                     .background(Color.blue)
                                     .foregroundColor(.white)
                                     .cornerRadius(8)
-                                
+
                                 Spacer()
-                                
+
                                 Text("\(paragraph.words.count) words")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
@@ -541,11 +539,11 @@ struct ParagraphSelectorView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
     }
-    
+
     private var filteredParagraphs: [PracticeParagraph] {
         dataManager.getParagraphs(for: selectedDifficulty, category: selectedCategory)
     }
-    
+
     private func difficultyColor(for difficulty: PracticeParagraph.Difficulty) -> Color {
         switch difficulty {
         case .beginner:
@@ -556,4 +554,4 @@ struct ParagraphSelectorView: View {
             return .red
         }
     }
-} 
+}
