@@ -76,32 +76,36 @@ struct TappableTextView: View {
     let paragraph: PracticeParagraph
     let wordAnalyses: [WordAnalysis]
     let onWordTap: (String) -> Void
+    let scrollTargetIndex: Int?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(paragraph.title)
-                .font(.headline)
+                .font(.title)
+                .fontWeight(.bold)
                 .foregroundColor(.primary)
-                .padding(.bottom, 4)
+                .multilineTextAlignment(.leading)
+                .padding(.bottom, 12)
 
             FlexibleView(
                 data: Array(paragraph.words.enumerated()),
                 spacing: 6,
                 alignment: .leading
-            ) { idx, pair in
+            ) { _, pair in
                 let (offset, word) = pair
                 let analysis = wordAnalyses.first { $0.expectedIndex == offset }
                 return Text(word)
-                    .font(.body)
+                    .font(.title2)
                     .foregroundColor(textColor(for: analysis))
                     .background(backgroundColor(for: analysis))
+                    .padding(analysis?.isCurrentWord == true ? 4 : 2)
                     .overlay(
                         RoundedRectangle(cornerRadius: 4)
                             .stroke(borderColor(for: analysis), lineWidth: analysis?.isCurrentWord == true ? 2 : 0)
                     )
                     .cornerRadius(4)
-                    .padding(analysis?.isCurrentWord == true ? 2 : 0)
                     .onTapGesture { onWordTap(word) }
+                    .id(offset)
             }
         }
         .padding()
@@ -113,6 +117,10 @@ struct TappableTextView: View {
     private func backgroundColor(for analysis: WordAnalysis?) -> Color {
         guard let analysis = analysis else { return Color.clear }
         if analysis.isCorrect {
+            // If it's a proper noun that was completed, use orange background
+            if analysis.isProperNoun {
+                return Color.orange.opacity(0.2)
+            }
             return Color.green.opacity(0.2)
         } else if analysis.isMissing {
             return Color.red.opacity(0.3)
@@ -128,6 +136,10 @@ struct TappableTextView: View {
     private func textColor(for analysis: WordAnalysis?) -> Color {
         guard let analysis = analysis else { return .primary }
         if analysis.isCorrect {
+            // If it's a proper noun that was completed, use orange text
+            if analysis.isProperNoun {
+                return .orange
+            }
             return .green
         } else if analysis.isMissing || analysis.isMispronounced {
             return .red
@@ -137,7 +149,7 @@ struct TappableTextView: View {
             return .primary
         }
     }
-    
+
     private func borderColor(for analysis: WordAnalysis?) -> Color {
         guard let analysis = analysis else { return Color.clear }
         if analysis.isCurrentWord {
@@ -177,13 +189,13 @@ struct TranscriptionView: View {
         .cornerRadius(12)
         .shadow(radius: 2)
     }
-    
+
     private var displayWordsView: some View {
         let words = transcribedText.components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }
-        
+
         let displayWords = words.count <= 4 ? words : Array(words.suffix(4))
-        
+
         return HStack(spacing: 8) {
             ForEach(Array(displayWords.enumerated()), id: \.offset) { index, word in
                 let isLastWord = index == displayWords.count - 1
