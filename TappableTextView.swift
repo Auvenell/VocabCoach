@@ -115,6 +115,10 @@ struct TappableTextView: View {
     private func backgroundColor(for analysis: WordAnalysis?) -> Color {
         guard let analysis = analysis else { return Color.clear }
         if analysis.isCorrect {
+            // If it's a proper noun that was completed, use orange background
+            if analysis.isProperNoun {
+                return Color.orange.opacity(0.2)
+            }
             return Color.green.opacity(0.2)
         } else if analysis.isMissing {
             return Color.red.opacity(0.3)
@@ -130,6 +134,10 @@ struct TappableTextView: View {
     private func textColor(for analysis: WordAnalysis?) -> Color {
         guard let analysis = analysis else { return .primary }
         if analysis.isCorrect {
+            // If it's a proper noun that was completed, use orange text
+            if analysis.isProperNoun {
+                return .orange
+            }
             return .green
         } else if analysis.isMissing || analysis.isMispronounced {
             return .red

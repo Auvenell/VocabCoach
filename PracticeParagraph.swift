@@ -36,6 +36,7 @@ struct WordAnalysis {
     let isMispronounced: Bool
     let isCurrentWord: Bool
     let isImportantWord: Bool
+    let isProperNoun: Bool
 }
 
 // Word classification helper for completion summary
@@ -99,6 +100,7 @@ struct ReadingSession {
     private mutating func initializeWordAnalyses() {
         wordAnalyses = paragraph.words.enumerated().map { index, word in
             let isImportant = WordClassifier.isImportantWord(word)
+            let isProperNoun = WordMatcher.shared.isProperNoun(word)
 
             return WordAnalysis(
                 word: word,
@@ -108,7 +110,8 @@ struct ReadingSession {
                 isMissing: false,
                 isMispronounced: false,
                 isCurrentWord: index == 0,
-                isImportantWord: isImportant
+                isImportantWord: isImportant,
+                isProperNoun: isProperNoun
             )
         }
     }
@@ -138,11 +141,11 @@ struct ReadingSession {
         
         // Use the new comprehensive word matching system
         let userSpoken = spokenWords.first { spokenWord in
-            isWordMatch(expected: expectedWord, spoken: spokenWord)
+            isWordMatch(expected: expectedWordRaw, spoken: spokenWord)
         }
         
         let isCorrect = userSpoken != nil
-        let isMissing = spokenWords.isEmpty || !spokenWords.contains { isWordMatch(expected: expectedWord, spoken: $0) }
+        let isMissing = spokenWords.isEmpty || !spokenWords.contains { isWordMatch(expected: expectedWordRaw, spoken: $0) }
         let isMispronounced = !isMissing && !isCorrect
         
         // print("[DEBUG] isCorrect: \(isCorrect), isMissing: \(isMissing), isMispronounced: \(isMispronounced)")
@@ -151,6 +154,7 @@ struct ReadingSession {
         if currentWordIndex < wordAnalyses.count {
             let currentWord = paragraph.words[currentWordIndex]
             let isImportant = WordClassifier.isImportantWord(currentWord)
+            let isProperNoun = WordMatcher.shared.isProperNoun(currentWord)
             
             wordAnalyses[currentWordIndex] = WordAnalysis(
                 word: currentWord,
@@ -160,7 +164,8 @@ struct ReadingSession {
                 isMissing: isMissing,
                 isMispronounced: isMispronounced,
                 isCurrentWord: true,
-                isImportantWord: isImportant
+                isImportantWord: isImportant,
+                isProperNoun: isProperNoun
             )
         }
         
@@ -228,7 +233,8 @@ struct ReadingSession {
                 isMissing: currentAnalysis.isMissing,
                 isMispronounced: currentAnalysis.isMispronounced,
                 isCurrentWord: false,
-                isImportantWord: currentAnalysis.isImportantWord
+                isImportantWord: currentAnalysis.isImportantWord,
+                isProperNoun: currentAnalysis.isProperNoun
             )
         }
 
@@ -251,7 +257,8 @@ struct ReadingSession {
                 isMissing: nextAnalysis.isMissing,
                 isMispronounced: nextAnalysis.isMispronounced,
                 isCurrentWord: true,
-                isImportantWord: nextAnalysis.isImportantWord
+                isImportantWord: nextAnalysis.isImportantWord,
+                isProperNoun: nextAnalysis.isProperNoun
             )
         }
     }
@@ -307,7 +314,8 @@ struct ReadingSession {
                 isMissing: false,
                 isMispronounced: false,
                 isCurrentWord: i == sentenceStart,
-                isImportantWord: WordClassifier.isImportantWord(word)
+                isImportantWord: WordClassifier.isImportantWord(word),
+                isProperNoun: WordMatcher.shared.isProperNoun(word)
             )
         }
         

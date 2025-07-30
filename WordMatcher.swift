@@ -16,22 +16,27 @@ class WordMatcher {
             return true
         }
         
-        // 2. Possessive form matching
+        // 2. Proper noun matching (more permissive for company names, etc.)
+        if isProperNounMatch(expected: expected, spoken: normalizedSpoken) {
+            return true
+        }
+        
+        // 3. Possessive form matching
         if isPossessiveMatch(expected: normalizedExpected, spoken: normalizedSpoken) {
             return true
         }
         
-        // 3. Homonym matching
+        // 4. Homonym matching
         if isHomonymMatch(expected: normalizedExpected, spoken: normalizedSpoken) {
             return true
         }
         
-        // 4. Phonetic similarity matching
+        // 5. Phonetic similarity matching
         if isPhoneticallySimilar(expected: normalizedExpected, spoken: normalizedSpoken) {
             return true
         }
         
-        // 5. Common speech recognition error patterns
+        // 6. Common speech recognition error patterns
         if isCommonRecognitionError(expected: normalizedExpected, spoken: normalizedSpoken) {
             return true
         }
@@ -46,6 +51,26 @@ class WordMatcher {
             .replacingOccurrences(of: "’", with: "'") // curly to straight
             .replacingOccurrences(of: "'", with: "'")
             .replacingOccurrences(of: "\"", with: "'")
+    }
+    
+    /// Check if a word is a proper noun (capitalized first letter)
+    func isProperNoun(_ word: String) -> Bool {
+        // Check if the word starts with a capital letter (indicating proper noun)
+        guard let firstChar = word.first else { return false }
+        let result = firstChar.isUppercase
+        print("[WordMatcher] isProperNoun('\(word)') -> \(result)")
+        return result
+    }
+    
+    /// Check if words are proper nouns (company names, etc.) - always pass if something is said
+    private func isProperNounMatch(expected: String, spoken: String) -> Bool {
+        // Check if the expected word is a known proper noun
+        if isProperNoun(expected) {
+            // For proper nouns, always pass if something was said (not empty)
+            return !spoken.isEmpty
+        }
+        
+        return false
     }
     
     /// Check if words are possessive forms of each other
