@@ -22,215 +22,147 @@ struct QuestionsView: View {
     @State private var vocabularyLockedAnswers: Set<String> = [] // word -> locked status
     @State private var recordingVocabularyWord: String? = nil // which vocabulary word is currently being recorded
     
-    // Computed property to get vocabulary words from practice session or article
-    private var practiceVocabularyWords: [String] {
-        if let session = practiceSession, !session.incorrectImportantWordsSet.isEmpty {
-            // Use words that were mispronounced during practice
-            return Array(session.incorrectImportantWordsSet).sorted()
-        } else {
-            // Use important words from the article if no practice session or perfect reading
-            return getImportantWordsFromArticle()
+    // Navigation state
+    @State private var currentSectionIndex = 0
+    @State private var currentQuestionIndex = 0
+    
+    // Computed properties for navigation
+    private var sections: [QuestionSection] {
+        var sections: [QuestionSection] = []
+        
+        if !viewModel.multipleChoiceQuestions.isEmpty {
+            sections.append(.multipleChoice)
         }
+        
+        if !viewModel.openEndedQuestions.isEmpty {
+            sections.append(.openEnded)
+        }
+        
+        if !vocabularyWords.isEmpty {
+            sections.append(.vocabulary)
+        }
+        
+        return sections
+    }
+    
+    private var currentSection: QuestionSection? {
+        guard currentSectionIndex < sections.count else { return nil }
+        return sections[currentSectionIndex]
+    }
+    
+    private var currentQuestion: Any? {
+        guard let section = currentSection else { return nil }
+        
+        switch section {
+        case .multipleChoice:
+            guard currentQuestionIndex < viewModel.multipleChoiceQuestions.count else { return nil }
+            return viewModel.multipleChoiceQuestions[currentQuestionIndex]
+        case .openEnded:
+            guard currentQuestionIndex < viewModel.openEndedQuestions.count else { return nil }
+            return viewModel.openEndedQuestions[currentQuestionIndex]
+        case .vocabulary:
+            guard currentQuestionIndex < vocabularyWords.count else { return nil }
+            return vocabularyWords[currentQuestionIndex]
+        }
+    }
+    
+    private var totalQuestionsInCurrentSection: Int {
+        guard let section = currentSection else { return 0 }
+        
+        switch section {
+        case .multipleChoice:
+            return viewModel.multipleChoiceQuestions.count
+        case .openEnded:
+            return viewModel.openEndedQuestions.count
+        case .vocabulary:
+            return vocabularyWords.count
+        }
+    }
+    
+    private var canGoNext: Bool {
+        if currentQuestionIndex < totalQuestionsInCurrentSection - 1 {
+            return true
+        }
+        return currentSectionIndex < sections.count - 1
+    }
+    
+    private var canGoPrevious: Bool {
+        if currentQuestionIndex > 0 {
+            return true
+        }
+        return currentSectionIndex > 0
     }
 
     var body: some View {
         VStack {
             if isLoading {
                 ProgressView("Loading questions...")
-            } else if viewModel.openEndedQuestions.isEmpty && viewModel.multipleChoiceQuestions.isEmpty {
+            } else if sections.isEmpty {
                 Text("No questions found for this article.")
                     .foregroundColor(.gray)
             } else {
-                ScrollView {
-                    VStack(spacing: 20) {
-                        if !viewModel.multipleChoiceQuestions.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Multiple Choice Questions")
-                                    .font(.headline)
-                                    .padding(.horizontal)
-                                
-                                ForEach(Array(viewModel.multipleChoiceQuestions.enumerated()), id: \.element.id) { index, question in
-                                    VStack(alignment: .leading, spacing: 12) {
-                                        HStack(alignment: .top, spacing: 12) {
-                                            Text("\(index + 1)")
-                                                .font(.title2)
-                                                .fontWeight(.bold)
-                                                .foregroundColor(.white)
-                                                .frame(width: 32, height: 32)
-                                                .background(
-                                                    Circle()
-                                                        .fill(Color.blue)
-                                                )
-                                            
-                                            Text(question.questionText)
-                                                .font(.headline)
-                                        }
-
-                                        VStack(spacing: 8) {
-                                            ForEach(Array(question.choices.enumerated()), id: \.element) { choiceIndex, choice in
-                                                let choiceLabel = ["A", "B", "C", "D"][choiceIndex]
-                                                HStack(alignment: .center, spacing: 12) {
-                                                    Text(choiceLabel)
-                                                        .font(.headline)
-                                                        .foregroundColor(.blue)
-                                                        .frame(width: 24, height: 24)
-                                                        .background(
-                                                            Circle()
-                                                                .fill(Color.blue.opacity(0.1))
-                                                        )
-                                                    
-                                                    Button(action: {
-                                                        selectedAnswers[question.questionText] = choice
-                                                        showSubmitButton = true
-                                                    }) {
-                                                        HStack {
-                                                            Text(choice)
-                                                                .foregroundColor(.primary)
-                                                                .multilineTextAlignment(.leading)
-                                                            Spacer()
-                                                            if selectedAnswers[question.questionText] == choice {
-                                                                Image(systemName: "checkmark.circle.fill")
-                                                                    .foregroundColor(.blue)
-                                                            }
-                                                        }
-                                                        .padding()
-                                                        .background(
-                                                            RoundedRectangle(cornerRadius: 8)
-                                                                .fill(selectedAnswers[question.questionText] == choice ?
-                                                                    Color.blue.opacity(0.1) : Color(.systemGray6))
-                                                                .overlay(
-                                                                    RoundedRectangle(cornerRadius: 8)
-                                                                        .stroke(selectedAnswers[question.questionText] == choice ?
-                                                                            Color.blue : Color.clear, lineWidth: 2)
-                                                                )
-                                                        )
-                                                    }
-                                                    .buttonStyle(PlainButtonStyle())
-                                                }
-                                            }
-                                        }
-                                        .padding(.horizontal)
+                VStack(spacing: 0) {
+                    // Progress indicator
+                    ProgressIndicatorView(
+                        currentSection: currentSectionIndex,
+                        totalSections: sections.count,
+                        currentQuestion: currentQuestionIndex + 1,
+                        totalQuestions: totalQuestionsInCurrentSection
+                    )
+                    
+                    // Current question content
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            if let section = currentSection, let question = currentQuestion {
+                                QuestionContentView(
+                                    section: section,
+                                    question: question,
+                                    questionIndex: currentQuestionIndex,
+                                    selectedAnswers: $selectedAnswers,
+                                    openEndedAnswers: $openEndedAnswers,
+                                    editingAnswers: $editingAnswers,
+                                    lockedAnswers: $lockedAnswers,
+                                    recordingQuestion: $recordingQuestion,
+                                    vocabularyAnswers: $vocabularyAnswers,
+                                    vocabularyEditingAnswers: $vocabularyEditingAnswers,
+                                    vocabularyLockedAnswers: $vocabularyLockedAnswers,
+                                    recordingVocabularyWord: $recordingVocabularyWord,
+                                    speechManager: speechManager,
+                                    onWordTap: { word in
+                                        selectedWord = word
+                                        showDictionary(for: word)
                                     }
-                                    .padding(.vertical, 8)
-                                    .background(Color(.systemBackground))
-                                    .cornerRadius(12)
-                                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
-                                    .padding(.horizontal)
-                                }
+                                )
                             }
                         }
-
-                        if !viewModel.openEndedQuestions.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Open-Ended Questions")
-                                    .font(.headline)
-                                    .padding(.horizontal)
-
-                                ForEach(Array(viewModel.openEndedQuestions.enumerated()), id: \.element.id) { index, question in
-                                    OpenEndedQuestionView(
-                                        questionNumber: index + 1,
-                                        question: question,
-                                        answer: openEndedAnswers[question.questionText] ?? "",
-                                        editingAnswer: editingAnswers[question.questionText] ?? "",
-                                        isLocked: lockedAnswers.contains(question.questionText),
-                                        isRecording: recordingQuestion == question.questionText,
-                                        transcribedText: speechManager.transcribedText,
-                                        onStartRecording: {
-                                            startRecording(for: question.questionText)
-                                        },
-                                        onStopRecording: {
-                                            stopRecording(for: question.questionText)
-                                        },
-                                        onAnswerChanged: { newAnswer in
-                                            editingAnswers[question.questionText] = newAnswer
-                                        },
-                                        onLockAnswer: {
-                                            lockAnswer(for: question.questionText)
-                                        },
-                                        onUnlockAnswer: {
-                                            unlockAnswer(for: question.questionText)
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                        
-                        // Vocabulary Practice Section
-                        if !vocabularyWords.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack {
-                                    Image(systemName: "book.fill")
-                                        .foregroundColor(.orange)
-                                    Text("Vocabulary Practice")
-                                        .font(.headline)
-                                        .foregroundColor(.primary)
-                                }
-                                .padding(.horizontal)
-                                
-                                Text("Use the given vocabulary word in a sentence")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                    .padding(.horizontal)
-                                
-                                VStack(spacing: 8) {
-                                    ForEach(Array(vocabularyWords.enumerated()), id: \.offset) { index, word in
-                                        VocabularyWordView(
-                                            wordNumber: index + 1,
-                                            word: word,
-                                            answer: vocabularyAnswers[word] ?? "",
-                                            editingAnswer: vocabularyEditingAnswers[word] ?? "",
-                                            isLocked: vocabularyLockedAnswers.contains(word),
-                                            isRecording: recordingVocabularyWord == word,
-                                            transcribedText: speechManager.transcribedText,
-                                            onWordTap: {
-                                                selectedWord = word
-                                                showDictionary(for: word)
-                                            },
-                                            onStartRecording: {
-                                                startVocabularyRecording(for: word)
-                                            },
-                                            onStopRecording: {
-                                                stopVocabularyRecording(for: word)
-                                            },
-                                            onAnswerChanged: { newAnswer in
-                                                vocabularyEditingAnswers[word] = newAnswer
-                                            },
-                                            onLockAnswer: {
-                                                lockVocabularyAnswer(for: word)
-                                            },
-                                            onUnlockAnswer: {
-                                                unlockVocabularyAnswer(for: word)
-                                            }
-                                        )
-                                    }
-                                }
-                                .padding(.horizontal)
-                            }
-                        }
-
-                        if showSubmitButton || !openEndedAnswers.isEmpty {
-                            Button(action: {
-                                // TODO: Handle submit action
-                                print("Selected answers: \(selectedAnswers)")
-                                print("Open-ended answers: \(openEndedAnswers)")
-                            }) {
-                                Text("Submit Answers")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.blue)
-                                    .cornerRadius(12)
-                            }
-                            .padding(.horizontal)
-                            .padding(.top, 20)
-                        }
+                        .padding()
                     }
-                    .padding(.vertical)
+                    
+                    // Navigation controls
+                    NavigationControlsView(
+                        canGoPrevious: canGoPrevious,
+                        canGoNext: canGoNext,
+                        onPrevious: goToPrevious,
+                        onNext: goToNext
+                    )
                 }
             }
         }
-        .navigationTitle("Questions")
+        .navigationTitle(currentSection?.rawValue ?? "Questions")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                if let section = currentSection {
+                    HStack {
+                        Image(systemName: section.icon)
+                            .foregroundColor(section.color)
+                        Text(section.rawValue)
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                    }
+                }
+            }
+        }
         .onAppear {
             viewModel.fetchQuestions(for: articleId)
             // Initialize vocabularyWords from practice session or article
@@ -257,6 +189,25 @@ struct QuestionsView: View {
             if let recordingVocabularyWord = recordingVocabularyWord {
                 vocabularyEditingAnswers[recordingVocabularyWord] = newText
             }
+        }
+    }
+    
+    // Navigation functions
+    private func goToNext() {
+        if currentQuestionIndex < totalQuestionsInCurrentSection - 1 {
+            currentQuestionIndex += 1
+        } else if currentSectionIndex < sections.count - 1 {
+            currentSectionIndex += 1
+            currentQuestionIndex = 0
+        }
+    }
+    
+    private func goToPrevious() {
+        if currentQuestionIndex > 0 {
+            currentQuestionIndex -= 1
+        } else if currentSectionIndex > 0 {
+            currentSectionIndex -= 1
+            currentQuestionIndex = totalQuestionsInCurrentSection - 1
         }
     }
     
@@ -355,6 +306,488 @@ struct QuestionsView: View {
             // Word not found in dictionary - could show an alert or just ignore
             print("No dictionary definition found for: \(cleanWord)")
         }
+    }
+}
+
+// MARK: - Supporting Types and Views
+
+enum QuestionSection: String, CaseIterable {
+    case multipleChoice = "Multiple Choice"
+    case openEnded = "Open-Ended"
+    case vocabulary = "Vocabulary Practice"
+    
+    var icon: String {
+        switch self {
+        case .multipleChoice:
+            return "list.bullet.circle"
+        case .openEnded:
+            return "text.bubble"
+        case .vocabulary:
+            return "book.fill"
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .multipleChoice:
+            return .blue
+        case .openEnded:
+            return .green
+        case .vocabulary:
+            return .orange
+        }
+    }
+}
+
+struct ProgressIndicatorView: View {
+    let currentSection: Int
+    let totalSections: Int
+    let currentQuestion: Int
+    let totalQuestions: Int
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            // Section progress
+            HStack {
+                Text("Section \(currentSection + 1) of \(totalSections)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text("Question \(currentQuestion) of \(totalQuestions)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal)
+            
+            // Progress bar
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Rectangle()
+                        .fill(Color(.systemGray5))
+                        .frame(height: 4)
+                    
+                    Rectangle()
+                        .fill(Color.blue)
+                        .frame(width: geometry.size.width * CGFloat(currentQuestion) / CGFloat(totalQuestions), height: 4)
+                }
+            }
+            .frame(height: 4)
+            .padding(.horizontal)
+        }
+        .padding(.vertical, 8)
+        .background(Color(.systemBackground))
+    }
+}
+
+struct NavigationControlsView: View {
+    let canGoPrevious: Bool
+    let canGoNext: Bool
+    let onPrevious: () -> Void
+    let onNext: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            Button(action: onPrevious) {
+                HStack {
+                    Image(systemName: "chevron.left")
+                    Text("Previous")
+                }
+                .foregroundColor(canGoPrevious ? .blue : .gray)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(canGoPrevious ? Color.blue : Color.gray, lineWidth: 1)
+                )
+            }
+            .disabled(!canGoPrevious)
+            
+            Spacer()
+            
+            Button(action: onNext) {
+                HStack {
+                    Text("Next")
+                    Image(systemName: "chevron.right")
+                }
+                .foregroundColor(canGoNext ? .white : .gray)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(canGoNext ? Color.blue : Color.gray)
+                )
+            }
+            .disabled(!canGoNext)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .overlay(
+            Rectangle()
+                .frame(height: 1)
+                .foregroundColor(Color(.systemGray4)),
+            alignment: .top
+        )
+    }
+}
+
+struct QuestionContentView: View {
+    let section: QuestionSection
+    let question: Any
+    let questionIndex: Int
+    @Binding var selectedAnswers: [String: String]
+    @Binding var openEndedAnswers: [String: String]
+    @Binding var editingAnswers: [String: String]
+    @Binding var lockedAnswers: Set<String>
+    @Binding var recordingQuestion: String?
+    @Binding var vocabularyAnswers: [String: String]
+    @Binding var vocabularyEditingAnswers: [String: String]
+    @Binding var vocabularyLockedAnswers: Set<String>
+    @Binding var recordingVocabularyWord: String?
+    let speechManager: SpeechRecognitionManager
+    let onWordTap: (String) -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Question content based on section type
+            switch section {
+            case .multipleChoice:
+                if let mcQuestion = question as? MultipleChoiceQuestion {
+                    MultipleChoiceQuestionView(
+                        question: mcQuestion,
+                        questionNumber: questionIndex + 1,
+                        selectedAnswer: selectedAnswers[mcQuestion.questionText],
+                        onAnswerSelected: { answer in
+                            selectedAnswers[mcQuestion.questionText] = answer
+                        }
+                    )
+                }
+            case .openEnded:
+                if let oeQuestion = question as? ComprehensionQuestion {
+                    OpenEndedQuestionView(
+                        questionNumber: questionIndex + 1,
+                        question: oeQuestion,
+                        answer: openEndedAnswers[oeQuestion.questionText] ?? "",
+                        editingAnswer: editingAnswers[oeQuestion.questionText] ?? "",
+                        isLocked: lockedAnswers.contains(oeQuestion.questionText),
+                        isRecording: recordingQuestion == oeQuestion.questionText,
+                        transcribedText: speechManager.transcribedText,
+                        onStartRecording: {
+                            startRecording(for: oeQuestion.questionText)
+                        },
+                        onStopRecording: {
+                            stopRecording(for: oeQuestion.questionText)
+                        },
+                        onAnswerChanged: { newAnswer in
+                            editingAnswers[oeQuestion.questionText] = newAnswer
+                        },
+                        onLockAnswer: {
+                            lockAnswer(for: oeQuestion.questionText)
+                        },
+                        onUnlockAnswer: {
+                            unlockAnswer(for: oeQuestion.questionText)
+                        }
+                    )
+                }
+            case .vocabulary:
+                if let word = question as? String {
+                    VocabularyWordView(
+                        wordNumber: questionIndex + 1,
+                        word: word,
+                        answer: vocabularyAnswers[word] ?? "",
+                        editingAnswer: vocabularyEditingAnswers[word] ?? "",
+                        isLocked: vocabularyLockedAnswers.contains(word),
+                        isRecording: recordingVocabularyWord == word,
+                        transcribedText: speechManager.transcribedText,
+                        onWordTap: {
+                            onWordTap(word)
+                        },
+                        onStartRecording: {
+                            startVocabularyRecording(for: word)
+                        },
+                        onStopRecording: {
+                            stopVocabularyRecording(for: word)
+                        },
+                        onAnswerChanged: { newAnswer in
+                            vocabularyEditingAnswers[word] = newAnswer
+                        },
+                        onLockAnswer: {
+                            lockVocabularyAnswer(for: word)
+                        },
+                        onUnlockAnswer: {
+                            unlockVocabularyAnswer(for: word)
+                        }
+                    )
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+    }
+    
+    // Helper functions for recording
+    private func startRecording(for questionText: String) {
+        recordingQuestion = questionText
+        speechManager.startListening()
+    }
+    
+    private func stopRecording(for questionText: String) {
+        recordingQuestion = nil
+        speechManager.stopListening()
+        openEndedAnswers[questionText] = editingAnswers[questionText] ?? ""
+    }
+    
+    private func lockAnswer(for questionText: String) {
+        lockedAnswers.insert(questionText)
+        openEndedAnswers[questionText] = editingAnswers[questionText] ?? ""
+    }
+    
+    private func unlockAnswer(for questionText: String) {
+        lockedAnswers.remove(questionText)
+    }
+    
+    private func startVocabularyRecording(for word: String) {
+        recordingVocabularyWord = word
+        speechManager.startListening()
+    }
+    
+    private func stopVocabularyRecording(for word: String) {
+        recordingVocabularyWord = nil
+        speechManager.stopListening()
+        vocabularyAnswers[word] = vocabularyEditingAnswers[word] ?? ""
+    }
+    
+    private func lockVocabularyAnswer(for word: String) {
+        vocabularyLockedAnswers.insert(word)
+        vocabularyAnswers[word] = vocabularyEditingAnswers[word] ?? ""
+    }
+    
+    private func unlockVocabularyAnswer(for word: String) {
+        vocabularyLockedAnswers.remove(word)
+    }
+}
+
+struct MultipleChoiceQuestionView: View {
+    let question: MultipleChoiceQuestion
+    let questionNumber: Int
+    let selectedAnswer: String?
+    let onAnswerSelected: (String) -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Question header
+            HStack(alignment: .top, spacing: 12) {
+                Text("\(questionNumber)")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .frame(width: 32, height: 32)
+                    .background(
+                        Circle()
+                            .fill(Color.blue)
+                    )
+                
+                Text(question.questionText)
+                    .font(.headline)
+            }
+            
+            // Choices
+            VStack(spacing: 8) {
+                ForEach(Array(question.choices.enumerated()), id: \.element) { choiceIndex, choice in
+                    let choiceLabel = ["A", "B", "C", "D"][choiceIndex]
+                    HStack(alignment: .center, spacing: 12) {
+                        Text(choiceLabel)
+                            .font(.headline)
+                            .foregroundColor(.blue)
+                            .frame(width: 24, height: 24)
+                            .background(
+                                Circle()
+                                    .fill(Color.blue.opacity(0.1))
+                            )
+                        
+                        Button(action: {
+                            onAnswerSelected(choice)
+                        }) {
+                            HStack {
+                                Text(choice)
+                                    .foregroundColor(.primary)
+                                    .multilineTextAlignment(.leading)
+                                Spacer()
+                                if selectedAnswer == choice {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(selectedAnswer == choice ?
+                                        Color.blue.opacity(0.1) : Color(.systemGray6))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(selectedAnswer == choice ?
+                                                Color.blue : Color.clear, lineWidth: 2)
+                                    )
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct OpenEndedQuestionView: View {
+    let questionNumber: Int
+    let question: ComprehensionQuestion
+    let answer: String
+    let editingAnswer: String
+    let isLocked: Bool
+    let isRecording: Bool
+    let transcribedText: String
+    let onStartRecording: () -> Void
+    let onStopRecording: () -> Void
+    let onAnswerChanged: (String) -> Void
+    let onLockAnswer: () -> Void
+    let onUnlockAnswer: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                Text("\(questionNumber)")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .frame(width: 32, height: 32)
+                    .background(
+                        Circle()
+                            .fill(Color.blue)
+                    )
+                
+                Text(question.questionText)
+                    .font(.headline)
+            }
+            
+            VStack(spacing: 8) {
+                // Answer display/editing area
+                if !editingAnswer.isEmpty || isRecording {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Your Answer:")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        TextEditor(text: Binding(
+                            get: { editingAnswer },
+                            set: { onAnswerChanged($0) }
+                        ))
+                        .frame(minHeight: 80)
+                        .padding(8)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                        .disabled(isLocked)
+                        
+                        // Recording status
+                        if isRecording {
+                            HStack {
+                                Image(systemName: "mic.fill")
+                                    .foregroundColor(.red)
+                                    .scaleEffect(1.2)
+                                Text("Recording... \(transcribedText)")
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                            }
+                        }
+                    }
+                    // Action buttons: Stop/Re-record & Lock/Unlock side by side
+                    HStack(spacing: 12) {
+                        if isRecording {
+                            Button(action: {
+                                onStopRecording()
+                            }) {
+                                HStack {
+                                    Image(systemName: "stop.fill")
+                                    Text("Stop")
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.red)
+                                )
+                            }
+                        } else {
+                            Button(action: {
+                                onAnswerChanged("")
+                                onStartRecording()
+                            }) {
+                                HStack {
+                                    Image(systemName: "arrow.clockwise")
+                                    Text("Re-record")
+                                }
+                                .foregroundColor(.orange)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.orange, lineWidth: 1)
+                                )
+                            }
+                            .disabled(isLocked)
+                        }
+                        
+                        Button(action: {
+                            if isLocked {
+                                onUnlockAnswer()
+                            } else {
+                                onLockAnswer()
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: isLocked ? "lock.fill" : "lock.open.fill")
+                                Text(isLocked ? "Unlock" : "Lock")
+                            }
+                            .foregroundColor(isLocked ? .green : .blue)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(isLocked ? Color.green : Color.blue, lineWidth: 1)
+                            )
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                } else if !isRecording {
+                    // Only show Record Answer button if not recording and no answer
+                    Button(action: {
+                        onStartRecording()
+                    }) {
+                        HStack {
+                            Image(systemName: "mic.fill")
+                            Text("Record Answer")
+                        }
+                        .foregroundColor(.blue)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.blue, lineWidth: 1)
+                        )
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(isLocked ? Color.green : Color.clear, lineWidth: 2)
+        )
     }
 }
 
@@ -519,158 +952,6 @@ struct VocabularyWordView: View {
                         
                         Spacer()
                     }
-                }
-            }
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(isLocked ? Color.green : Color.clear, lineWidth: 2)
-        )
-    }
-}
-
-struct OpenEndedQuestionView: View {
-    let questionNumber: Int
-    let question: ComprehensionQuestion
-    let answer: String
-    let editingAnswer: String
-    let isLocked: Bool
-    let isRecording: Bool
-    let transcribedText: String
-    let onStartRecording: () -> Void
-    let onStopRecording: () -> Void
-    let onAnswerChanged: (String) -> Void
-    let onLockAnswer: () -> Void
-    let onUnlockAnswer: () -> Void
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 12) {
-                Text("\(questionNumber)")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                    .frame(width: 32, height: 32)
-                    .background(
-                        Circle()
-                            .fill(Color.blue)
-                    )
-                
-                Text(question.questionText)
-                    .font(.headline)
-            }
-            
-            VStack(spacing: 8) {
-                // Answer display/editing area
-                if !editingAnswer.isEmpty || isRecording {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Your Answer:")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
-                        TextEditor(text: Binding(
-                            get: { editingAnswer },
-                            set: { onAnswerChanged($0) }
-                        ))
-                        .frame(minHeight: 80)
-                        .padding(8)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(8)
-                        .disabled(isLocked)
-                        
-                        // Recording status
-                        if isRecording {
-                            HStack {
-                                Image(systemName: "mic.fill")
-                                    .foregroundColor(.red)
-                                    .scaleEffect(1.2)
-                                Text("Recording... \(transcribedText)")
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                            }
-                        }
-                    }
-                    // Action buttons: Stop/Re-record & Lock/Unlock side by side
-                    HStack(spacing: 12) {
-                        if isRecording {
-                            Button(action: {
-                                onStopRecording()
-                            }) {
-                                HStack {
-                                    Image(systemName: "stop.fill")
-                                    Text("Stop")
-                                }
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(Color.red)
-                                )
-                            }
-                        } else {
-                            Button(action: {
-                                onAnswerChanged("")
-                                onStartRecording()
-                            }) {
-                                HStack {
-                                    Image(systemName: "arrow.clockwise")
-                                    Text("Re-record")
-                                }
-                                .foregroundColor(.orange)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.orange, lineWidth: 1)
-                                )
-                            }
-                            .disabled(isLocked)
-                        }
-                        
-                        Button(action: {
-                            if isLocked {
-                                onUnlockAnswer()
-                            } else {
-                                onLockAnswer()
-                            }
-                        }) {
-                            HStack {
-                                Image(systemName: isLocked ? "lock.fill" : "lock.open.fill")
-                                Text(isLocked ? "Unlock" : "Lock")
-                            }
-                            .foregroundColor(isLocked ? .green : .blue)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(isLocked ? Color.green : Color.blue, lineWidth: 1)
-                            )
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                } else if !isRecording {
-                    // Only show Record Answer button if not recording and no answer
-                    Button(action: {
-                        onStartRecording()
-                    }) {
-                        HStack {
-                            Image(systemName: "mic.fill")
-                            Text("Record Answer")
-                        }
-                        .foregroundColor(.blue)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.blue, lineWidth: 1)
-                        )
-                    }
-                    .frame(maxWidth: .infinity)
                 }
             }
         }
