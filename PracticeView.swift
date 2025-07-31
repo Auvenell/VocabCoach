@@ -24,7 +24,10 @@ struct PracticeView: View {
             }
             .padding()
             .navigationDestination(isPresented: $showQuestions) {
-                QuestionsView(articleId: selectedParagraph?.id ?? "")
+                QuestionsView(
+                    articleId: selectedParagraph?.id ?? "",
+                    practiceSession: currentSession
+                )
             }
             .sheet(isPresented: $showingParagraphSelector) {
                 ParagraphSelectorView(
