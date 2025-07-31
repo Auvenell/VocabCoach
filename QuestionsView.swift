@@ -21,6 +21,7 @@ struct QuestionsView: View {
     @State private var vocabularyEditingAnswers: [String: String] = [:] // word -> currently editing answer
     @State private var vocabularyLockedAnswers: Set<String> = [] // word -> locked status
     @State private var recordingVocabularyWord: String? = nil // which vocabulary word is currently being recorded
+    @State private var showingArticle = false // for showing article in bottom sheet
     
     // Navigation state
     @State private var currentSectionIndex = 0
@@ -162,6 +163,18 @@ struct QuestionsView: View {
                     }
                 }
             }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    showingArticle = true
+                }) {
+                    Image(systemName: "doc.text")
+                        .foregroundColor(.blue)
+                }
+            }
+        }
+        .sheet(isPresented: $showingArticle) {
+            ArticleView(articleId: articleId, practiceSession: practiceSession)
         }
         .onAppear {
             viewModel.fetchQuestions(for: articleId)
@@ -963,5 +976,56 @@ struct VocabularyWordView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(isLocked ? Color.green : Color.clear, lineWidth: 2)
         )
+    }
+}
+
+struct ArticleView: View {
+    let articleId: String
+    let practiceSession: ReadingSession?
+    @StateObject private var viewModel = ArticleViewModel()
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            VStack {
+                if let session = practiceSession {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text(session.paragraph.title)
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .padding(.horizontal)
+                            
+                            Text(session.paragraph.text)
+                                .font(.body)
+                                .lineSpacing(4)
+                                .padding(.horizontal)
+                        }
+                        .padding(.vertical)
+                    }
+                } else {
+                    VStack {
+                        ProgressView("Loading article...")
+                            .padding()
+                    }
+                }
+            }
+            .navigationTitle("Article")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .onAppear {
+            // Load article data if needed
+            if practiceSession == nil {
+                // Handle case where we need to load article data
+                // This would depend on your data structure
+            }
+        }
     }
 }
