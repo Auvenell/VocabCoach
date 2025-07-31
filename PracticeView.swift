@@ -249,9 +249,33 @@ struct PracticeView: View {
                                     .frame(maxHeight: 120)
                                 }
                                 // Trigger navigation to questions when completed
-                                Button("Continue to Questions") {
+                                Button(action: {
                                     showQuestions = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "arrow.right.circle.fill")
+                                            .font(.title2)
+                                        Text("Continue to Questions")
+                                            .font(.headline)
+                                            .fontWeight(.semibold)
+                                    }
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 16)
+                                    .padding(.horizontal, 24)
+                                    .background(
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [Color.blue, Color.blue.opacity(0.8)]),
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .cornerRadius(12)
+                                    .shadow(color: .blue.opacity(0.3), radius: 4, x: 0, y: 2)
                                 }
+                                .buttonStyle(PlainButtonStyle())
+                                .padding(.horizontal)
+                                .padding(.top, 16)
                             }
                         }
                     }
