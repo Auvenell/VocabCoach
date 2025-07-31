@@ -235,7 +235,13 @@ struct QuestionsView: View {
             viewModel.fetchQuestions(for: articleId)
             // Initialize vocabularyWords from practice session or article
             if let session = practiceSession, !session.incorrectImportantWordsSet.isEmpty {
-                vocabularyWords = Array(session.incorrectImportantWordsSet).sorted()
+                vocabularyWords = Array(session.incorrectImportantWordsSet)
+                    .sorted()
+                    .map { word in
+                        // Remove punctuation and capitalize first letter
+                        let cleanWord = word.trimmingCharacters(in: .punctuationCharacters)
+                        return cleanWord.prefix(1).uppercased() + cleanWord.dropFirst().lowercased()
+                    }
             } else {
                 vocabularyWords = getImportantWordsFromArticle()
             }
@@ -317,6 +323,11 @@ struct QuestionsView: View {
             }
             .prefix(5)
             .sorted()
+            .map { word in
+                // Remove punctuation and capitalize first letter
+                let cleanWord = word.trimmingCharacters(in: .punctuationCharacters)
+                return cleanWord.prefix(1).uppercased() + cleanWord.dropFirst().lowercased()
+            }
         
         return Array(uniqueImportantWords)
     }
