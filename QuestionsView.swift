@@ -375,13 +375,10 @@ struct VocabularyWordView: View {
                             .fill(Color.orange)
                     )
                 
-                Button(action: onWordTap) {
-                    Text(word)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                        .multilineTextAlignment(.leading)
-                }
-                .buttonStyle(PlainButtonStyle())
+                Text(word)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                    .multilineTextAlignment(.leading)
             }
             
             VStack(spacing: 8) {
@@ -474,23 +471,40 @@ struct VocabularyWordView: View {
                     }
                     .frame(maxWidth: .infinity)
                 } else if !isRecording {
-                    // Only show Record Answer button if not recording and no answer
-                    Button(action: {
-                        onStartRecording()
-                    }) {
-                        HStack {
-                            Image(systemName: "mic.fill")
-                            Text("Record Sentence")
+                    // Show Definition and Record Sentence buttons side by side
+                    HStack(spacing: 8) {
+                        Button(action: onWordTap) {
+                            HStack {
+                                Image(systemName: "book.fill")
+                                Text("Definition")
+                            }
+                            .foregroundColor(.blue)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.blue, lineWidth: 1)
+                            )
                         }
-                        .foregroundColor(.orange)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.orange, lineWidth: 1)
-                        )
+                        .frame(maxWidth: .infinity)
+                        
+                        Button(action: {
+                            onStartRecording()
+                        }) {
+                            HStack {
+                                Image(systemName: "mic.fill")
+                                Text("Record Sentence")
+                            }
+                            .foregroundColor(.orange)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.orange, lineWidth: 1)
+                            )
+                        }
+                        .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: .infinity)
                 }
             }
         }
