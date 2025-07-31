@@ -482,22 +482,22 @@ struct VocabularyWordView: View {
                     }
                     .frame(maxWidth: .infinity)
                 } else if !isRecording {
-                    // Show Definition and Record Sentence buttons side by side
-                    HStack(spacing: 8) {
+                    // Show Define button on the left and Record Sentence button centered
+                    HStack(spacing: 4) {
                         Button(action: onWordTap) {
                             HStack {
                                 Image(systemName: "book.fill")
-                                Text("Definition")
                             }
                             .foregroundColor(.blue)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
                             .background(
-                                RoundedRectangle(cornerRadius: 8)
+                                RoundedRectangle(cornerRadius: 6)
                                     .stroke(Color.blue, lineWidth: 1)
                             )
                         }
-                        .frame(maxWidth: .infinity)
+                        
+                        Spacer()
                         
                         Button(action: {
                             onStartRecording()
@@ -514,7 +514,10 @@ struct VocabularyWordView: View {
                                     .stroke(Color.orange, lineWidth: 1)
                             )
                         }
-                        .frame(maxWidth: .infinity)
+                        
+                        Spacer()
+                        
+                        Spacer()
                     }
                 }
             }
