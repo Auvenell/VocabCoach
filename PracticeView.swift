@@ -1,4 +1,5 @@
 import SwiftUI
+import FirebaseAuth
 
 struct PracticeView: View {
     @StateObject private var speechManager = SpeechRecognitionManager()
@@ -13,6 +14,7 @@ struct PracticeView: View {
     @State private var feedbackMessage = ""
     @State private var scrollTargetIndex: Int? = nil
     @State private var showQuestions = false
+
 
     var body: some View {
         NavigationStack {
@@ -49,6 +51,7 @@ struct PracticeView: View {
             } message: {
                 Text(feedbackMessage)
             }
+
         }
         .onReceive(speechManager.$transcribedText) { transcription in
             if currentSession != nil, !transcription.isEmpty {
@@ -66,9 +69,8 @@ struct PracticeView: View {
 
     private var welcomeView: some View {
         VStack(spacing: 30) {
-            Image(systemName: "mic.circle.fill")
-                .font(.system(size: 80))
-                .foregroundColor(.blue)
+            // Microphone animation
+            MicrophoneAnimation(isListening: false)
 
             Text("Welcome to Vocab Coach")
                 .font(.largeTitle)
@@ -332,6 +334,9 @@ struct PracticeView: View {
         speechManager.stopListening()
         currentSession = session
 
+        // Save session to progress tracking
+        saveSessionToProgress(session)
+
         // Provide final feedback
         let accuracy = session.accuracy
         let feedback: String
@@ -348,6 +353,43 @@ struct PracticeView: View {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             ttsManager.speakFeedback(feedback)
+        }
+    }
+    
+    private func saveSessionToProgress(_ session: ReadingSession) {
+        guard let userId = Auth.auth().currentUser?.uid else { return }
+        
+        let timeSpent = session.endTime?.timeIntervalSince(session.startTime ?? Date()) ?? 0
+        
+        let readingSession = UserReadingSession(
+            sessionId: UUID().uuidString,
+            userId: userId,
+            articleId: session.paragraph.id,
+            articleTitle: session.paragraph.title,
+            difficulty: session.paragraph.difficulty.rawValue,
+            category: session.paragraph.category.rawValue,
+            startTime: session.startTime ?? Date(),
+            endTime: session.endTime,
+            totalWords: session.totalWords,
+            correctWords: session.correctWords,
+            accuracy: session.accuracy,
+            timeSpent: timeSpent,
+            wordsToReview: session.wordsToReview,
+            completed: session.isCompleted,
+            createdAt: Date()
+        )
+        
+        let progressManager = UserProgressManager()
+        progressManager.saveReadingSession(readingSession)
+        
+        // Update word progress for each word
+        for (index, wordAnalysis) in session.wordAnalyses.enumerated() {
+            let word = session.paragraph.words[index]
+            progressManager.updateWordProgress(
+                userId: userId,
+                word: word,
+                isCorrect: wordAnalysis.isCorrect
+            )
         }
     }
 
@@ -388,10 +430,10 @@ struct PracticeView: View {
             let reviewWords = session.wordsToReview
 
             if reviewWords.isEmpty {
-                feedbackMessage = "Excellent! You've completed the paragraph perfectly!"
+                feedbackMessage = "Excellent! You've completed the paragraph perfectly! 🎉"
             } else {
                 let wordList = reviewWords.joined(separator: ", ")
-                feedbackMessage = "Great job! You completed the paragraph. Words to practice: \(wordList)"
+                feedbackMessage = "Great job! You completed the paragraph. Words to practice: \(wordList) 🎉"
             }
             // Set selectedParagraph for navigation
             if let sessionParagraph = currentSession?.paragraph {
@@ -476,6 +518,8 @@ struct PracticeView: View {
         let targetIndex = session.currentWordIndex > buffer ? session.currentWordIndex - buffer : 0
         scrollTargetIndex = targetIndex
     }
+    
+
 }
 
 struct ParagraphSelectorView: View {

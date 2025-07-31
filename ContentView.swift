@@ -20,6 +20,7 @@ struct ContentView: View {
     @StateObject private var headerState = HeaderState()
     @State private var isSidebarShowing = false
     @State private var showingParagraphSelector = false
+    @State private var showingProgressDashboard = false
 
     var body: some View {
         ZStack {
@@ -86,16 +87,29 @@ struct ContentView: View {
                 .padding(.top, 8)
 
                 // Main content area
-                PracticeView(showingParagraphSelector: $showingParagraphSelector)
+                if showingProgressDashboard {
+                    ProgressDashboardView(onBack: {
+                        showingProgressDashboard = false
+                    })
                     .environmentObject(headerState)
+                } else {
+                    PracticeView(showingParagraphSelector: $showingParagraphSelector)
+                        .environmentObject(headerState)
+                }
 
                 Spacer()
             }
 
             // Sidebar overlay
-            SidebarView(isShowing: $isSidebarShowing) {
-                showingParagraphSelector = true
-            }
+            SidebarView(
+                isShowing: $isSidebarShowing,
+                onSelectText: {
+                    showingParagraphSelector = true
+                },
+                onSelectProgress: {
+                    showingProgressDashboard = true
+                }
+            )
         }
     }
 }
