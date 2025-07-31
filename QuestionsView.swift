@@ -26,7 +26,7 @@ struct QuestionsView: View {
     private var practiceVocabularyWords: [String] {
         if let session = practiceSession, !session.incorrectImportantWordsSet.isEmpty {
             // Use words that were mispronounced during practice
-            return Array(session.incorrectImportantWordsSet)
+            return Array(session.incorrectImportantWordsSet).sorted()
         } else {
             // Use important words from the article if no practice session or perfect reading
             return getImportantWordsFromArticle()
@@ -156,7 +156,7 @@ struct QuestionsView: View {
                         }
                         
                         // Vocabulary Practice Section
-                        if !practiceVocabularyWords.isEmpty {
+                        if !vocabularyWords.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack {
                                     Image(systemName: "book.fill")
@@ -173,7 +173,7 @@ struct QuestionsView: View {
                                     .padding(.horizontal)
                                 
                                 VStack(spacing: 8) {
-                                    ForEach(Array(practiceVocabularyWords.enumerated()), id: \.element) { index, word in
+                                    ForEach(Array(vocabularyWords.enumerated()), id: \.offset) { index, word in
                                         VocabularyWordView(
                                             wordNumber: index + 1,
                                             word: word,
@@ -233,6 +233,12 @@ struct QuestionsView: View {
         .navigationTitle("Questions")
         .onAppear {
             viewModel.fetchQuestions(for: articleId)
+            // Initialize vocabularyWords from practice session or article
+            if let session = practiceSession, !session.incorrectImportantWordsSet.isEmpty {
+                vocabularyWords = Array(session.incorrectImportantWordsSet).sorted()
+            } else {
+                vocabularyWords = getImportantWordsFromArticle()
+            }
             // Add a slight delay to show loading spinner
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 isLoading = false
@@ -310,6 +316,7 @@ struct QuestionsView: View {
                 return !commonWords.contains(word.lowercased())
             }
             .prefix(5)
+            .sorted()
         
         return Array(uniqueImportantWords)
     }
