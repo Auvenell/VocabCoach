@@ -4,6 +4,7 @@ struct PracticeView: View {
     @StateObject private var speechManager = SpeechRecognitionManager()
     @StateObject private var ttsManager = TextToSpeechManager()
     @StateObject private var dataManager = ParagraphDataManager()
+    @EnvironmentObject var headerState: HeaderState
 
     @State private var currentSession: ReadingSession?
     @State private var selectedParagraph: PracticeParagraph?
@@ -28,6 +29,7 @@ struct PracticeView: View {
                     articleId: selectedParagraph?.id ?? "",
                     practiceSession: currentSession
                 )
+                .environmentObject(headerState)
             }
             .sheet(isPresented: $showingParagraphSelector) {
                 ParagraphSelectorView(
@@ -52,6 +54,13 @@ struct PracticeView: View {
             if currentSession != nil, !transcription.isEmpty {
                 updateSession(with: transcription)
             }
+        }
+        .onAppear {
+            // Set header for practice screen
+            headerState.showBackButton = false
+            headerState.title = "Reading"
+            headerState.titleIcon = "book.fill"
+            headerState.titleColor = .blue
         }
     }
 

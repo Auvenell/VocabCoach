@@ -7,6 +7,8 @@ struct QuestionsView: View {
     let practiceSession: ReadingSession? // Optional practice session data
     @StateObject private var viewModel = ArticleViewModel()
     @StateObject private var speechManager = SpeechRecognitionManager()
+    @EnvironmentObject var headerState: HeaderState
+    @Environment(\.dismiss) private var dismiss
     @State private var isLoading = true
     @State private var selectedAnswers: [String: String] = [:] // questionText -> selected choice
     @State private var openEndedAnswers: [String: String] = [:] // questionText -> recorded answer
@@ -117,7 +119,7 @@ struct QuestionsView: View {
                             if let section = currentSection, let question = currentQuestion {
                                 QuestionContentView(
                                     section: section,
-                                    question: question,
+                                        question: question,
                                     questionIndex: currentQuestionIndex,
                                     selectedAnswers: $selectedAnswers,
                                     openEndedAnswers: $openEndedAnswers,
@@ -130,8 +132,8 @@ struct QuestionsView: View {
                                     recordingVocabularyWord: $recordingVocabularyWord,
                                     speechManager: speechManager,
                                     onWordTap: { word in
-                                        selectedWord = word
-                                        showDictionary(for: word)
+                                                selectedWord = word
+                                                showDictionary(for: word)
                                     }
                                 )
                             }
@@ -144,39 +146,26 @@ struct QuestionsView: View {
                         canGoPrevious: canGoPrevious,
                         canGoNext: canGoNext,
                         onPrevious: goToPrevious,
-                        onNext: goToNext
+                        onNext: goToNext,
+                        onShowArticle: {
+                            showingArticle = true
+                        }
                     )
                 }
             }
         }
-        .navigationTitle(currentSection?.rawValue ?? "Questions")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                if let section = currentSection {
-                    HStack {
-                        Image(systemName: section.icon)
-                            .foregroundColor(section.color)
-                        Text(section.rawValue)
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                    }
-                }
-            }
-            
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    showingArticle = true
-                }) {
-                    Image(systemName: "doc.text")
-                        .foregroundColor(.blue)
-                }
-            }
-        }
+        .navigationBarHidden(true)
         .sheet(isPresented: $showingArticle) {
             ArticleView(articleId: articleId, practiceSession: practiceSession)
         }
         .onAppear {
+            // Set up header
+            headerState.showBackButton = true
+            headerState.backButtonAction = {
+                dismiss()
+            }
+            updateHeaderTitle()
+            
             viewModel.fetchQuestions(for: articleId)
             // Initialize vocabularyWords from practice session or article
             if let session = practiceSession, !session.incorrectImportantWordsSet.isEmpty {
@@ -194,6 +183,16 @@ struct QuestionsView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 isLoading = false
             }
+        }
+        .onChange(of: currentSection) { _, section in
+            updateHeaderTitle()
+        }
+        .onDisappear {
+            // Restore practice view header when leaving questions view
+            headerState.showBackButton = false
+            headerState.title = "Reading"
+            headerState.titleIcon = "book.fill"
+            headerState.titleColor = .blue
         }
         .onChange(of: speechManager.transcribedText) { oldValue, newText in
             if let recordingQuestion = recordingQuestion {
@@ -267,6 +266,18 @@ struct QuestionsView: View {
     
     private func unlockVocabularyAnswer(for word: String) {
         vocabularyLockedAnswers.remove(word)
+    }
+    
+    // Update header title based on current section
+    private func updateHeaderTitle() {
+        if let section = currentSection {
+            headerState.title = section.rawValue
+            headerState.titleIcon = section.icon
+            headerState.titleColor = section.color
+        } else {
+            headerState.title = ""
+            headerState.titleIcon = ""
+        }
     }
     
     // Get important words from the article for vocabulary practice
@@ -397,13 +408,13 @@ struct NavigationControlsView: View {
     let canGoNext: Bool
     let onPrevious: () -> Void
     let onNext: () -> Void
+    let onShowArticle: () -> Void
     
     var body: some View {
         HStack(spacing: 16) {
             Button(action: onPrevious) {
                 HStack {
                     Image(systemName: "chevron.left")
-                    Text("Previous")
                 }
                 .foregroundColor(canGoPrevious ? .blue : .gray)
                 .padding(.horizontal, 20)
@@ -414,12 +425,28 @@ struct NavigationControlsView: View {
                 )
             }
             .disabled(!canGoPrevious)
+            .frame(width: 60)
+            
+            Spacer()
+            
+            Button(action: onShowArticle) {
+                HStack {
+                    Image(systemName: "doc.text")
+                    Text("See Reading")
+                }
+                .foregroundColor(.blue)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.blue, lineWidth: 1)
+                )
+            }
             
             Spacer()
             
             Button(action: onNext) {
                 HStack {
-                    Text("Next")
                     Image(systemName: "chevron.right")
                 }
                 .foregroundColor(canGoNext ? .white : .gray)
@@ -431,6 +458,7 @@ struct NavigationControlsView: View {
                 )
             }
             .disabled(!canGoNext)
+            .frame(width: 60)
         }
         .padding()
         .background(Color(.systemBackground))
@@ -774,18 +802,18 @@ struct OpenEndedQuestionView: View {
                     .frame(maxWidth: .infinity)
                 } else if !isRecording {
                     // Only show Record Answer button if not recording and no answer
-                    Button(action: {
-                        onStartRecording()
-                    }) {
-                        HStack {
-                            Image(systemName: "mic.fill")
+                        Button(action: {
+                            onStartRecording()
+                        }) {
+                            HStack {
+                                Image(systemName: "mic.fill")
                             Text("Record Answer")
-                        }
+                            }
                         .foregroundColor(.blue)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
                                 .stroke(Color.blue, lineWidth: 1)
                         )
                     }
@@ -945,18 +973,18 @@ struct VocabularyWordView: View {
                         
                         Spacer()
                         
-                        Button(action: {
-                            onStartRecording()
-                        }) {
-                            HStack {
-                                Image(systemName: "mic.fill")
+                    Button(action: {
+                        onStartRecording()
+                    }) {
+                        HStack {
+                            Image(systemName: "mic.fill")
                                 Text("Record Sentence")
-                            }
+                        }
                             .foregroundColor(.orange)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
                                     .stroke(Color.orange, lineWidth: 1)
                             )
                         }
