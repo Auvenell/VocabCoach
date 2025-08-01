@@ -163,7 +163,12 @@ class LLMEvaluationService: ObservableObject {
                let message = firstChoice["message"] as? [String: Any],
                let content = message["content"] as? String {
                 
-                // Try to extract JSON from the content
+                // Extract JSON from markdown code blocks (```json ... ```)
+                if let jsonContent = extractJSONFromMarkdown(content) {
+                    return parseJSONResponse(jsonContent)
+                }
+                
+                // Try to extract JSON from the content (fallback)
                 let jsonPattern = "\\{[^}]*\"isCorrect\"[^}]*\\}"
                 if let range = content.range(of: jsonPattern, options: .regularExpression) {
                     let jsonString = String(content[range])
@@ -187,6 +192,10 @@ class LLMEvaluationService: ObservableObject {
         }
         
         // Fallback: try to extract JSON from the raw response
+        if let jsonContent = extractJSONFromMarkdown(response) {
+            return parseJSONResponse(jsonContent)
+        }
+        
         let jsonPattern = "\\{[^}]*\"isCorrect\"[^}]*\\}"
         if let range = response.range(of: jsonPattern, options: .regularExpression) {
             let jsonString = String(response[range])
@@ -204,6 +213,32 @@ class LLMEvaluationService: ObservableObject {
             feedback: "LLM evaluation completed",
             reasoning: response
         )
+    }
+    
+    private func extractJSONFromMarkdown(_ content: String) -> String? {
+        // Pattern to match ```json ... ``` blocks
+        let pattern = "```json\\s*([\\s\\S]*?)\\s*```"
+        
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+            return nil
+        }
+        
+        let range = NSRange(location: 0, length: content.utf16.count)
+        guard let match = regex.firstMatch(in: content, options: [], range: range) else {
+            return nil
+        }
+        
+        // Extract the JSON content from the first capture group
+        let jsonRange = match.range(at: 1)
+        guard jsonRange.location != NSNotFound else {
+            return nil
+        }
+        
+        let startIndex = content.index(content.startIndex, offsetBy: jsonRange.location)
+        let endIndex = content.index(startIndex, offsetBy: jsonRange.length)
+        let jsonContent = String(content[startIndex..<endIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        return jsonContent
     }
     
     private func parseJSONResponse(_ jsonString: String) -> EvaluationResponse? {

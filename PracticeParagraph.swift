@@ -329,4 +329,37 @@ struct ReadingSession {
     mutating func skipCurrentWord() {
         advanceToNextWord()
     }
+    
+    // Public method to skip to the end of the passage
+    mutating func skipToEnd() {
+        // Mark all remaining words as correct and advance to the end
+        for i in currentWordIndex..<wordAnalyses.count {
+            let word = paragraph.words[i]
+            let isImportant = WordClassifier.isImportantWord(word)
+            let isFirstInSentence = isFirstWordOfSentence(i)
+            let isProperNoun = isFirstInSentence ? false : WordMatcher.shared.isProperNoun(word)
+            
+            wordAnalyses[i] = WordAnalysis(
+                word: word,
+                expectedIndex: i,
+                isCorrect: true,
+                userSpoken: nil,
+                isMissing: false,
+                isMispronounced: false,
+                isCurrentWord: false,
+                isImportantWord: isImportant,
+                isProperNoun: isProperNoun
+            )
+        }
+        
+        // Update correct words count
+        correctWords = totalWords
+        
+        // Move to the end
+        currentWordIndex = totalWords
+        
+        // Reset current word attempts and start time
+        currentWordAttempts = 0
+        currentWordStartTime = nil
+    }
 }

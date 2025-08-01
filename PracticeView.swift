@@ -178,23 +178,42 @@ struct PracticeView: View {
                         .background(Color.blue.opacity(0.1))
                         .cornerRadius(8)
                     }
-                    // Skip Word button
+                    // Skip Word and Skip to End buttons
                     if !session.isCompleted, session.currentWord != nil {
-                        Button(action: {
-                            skipCurrentWord()
-                        }) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "forward.fill")
-                                    .font(.system(size: 16))
-                                    .foregroundColor(.orange)
-                                Text("Skip Word")
-                                    .font(.subheadline)
-                                    .foregroundColor(.orange)
+                        HStack(spacing: 8) {
+                            Button(action: {
+                                skipCurrentWord()
+                            }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "forward.fill")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(.orange)
+                                    Text("Skip Word")
+                                        .font(.subheadline)
+                                        .foregroundColor(.orange)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color.orange.opacity(0.1))
+                                .cornerRadius(8)
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(Color.orange.opacity(0.1))
-                            .cornerRadius(8)
+                            
+                            Button(action: {
+                                skipToEnd()
+                            }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "forward.end.fill")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(.purple)
+                                    Text("Skip to End")
+                                        .font(.subheadline)
+                                        .foregroundColor(.purple)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color.purple.opacity(0.1))
+                                .cornerRadius(8)
+                            }
                         }
                     }
                 }
@@ -517,6 +536,18 @@ struct PracticeView: View {
         let buffer = 5
         let targetIndex = session.currentWordIndex > buffer ? session.currentWordIndex - buffer : 0
         scrollTargetIndex = targetIndex
+    }
+    
+    private func skipToEnd() {
+        guard var session = currentSession, !session.isCompleted else { return }
+        session.skipToEnd()
+        currentSession = session
+        // Haptic feedback for skipping to end
+        DispatchQueue.main.async {
+            HapticManager.shared.mediumImpact()
+        }
+        // Scroll to the end to show completion
+        scrollTargetIndex = session.totalWords - 1
     }
     
 

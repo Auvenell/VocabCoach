@@ -3,6 +3,19 @@ import FirebaseAuth
 import SwiftUI
 import UIKit
 
+// MARK: - Open-Ended Question Response Data Structure
+
+struct OpenEndedQuestionResponse: Codable {
+    let questionNumber: Int
+    let questionText: String
+    let studentAnswer: String
+    let llmFeedback: String
+    let llmReason: String
+    let score: Double
+    let isCorrect: Bool
+    let timestamp: Date
+}
+
 struct QuestionsView: View {
     let articleId: String
     let practiceSession: ReadingSession? // Optional practice session data
@@ -37,6 +50,9 @@ struct QuestionsView: View {
     @State private var sessionCompleted: Bool = false
     @State private var showingSubmitButton: Bool = false
     @State private var showingResults: Bool = false
+    
+    // Open-ended question responses storage
+    @State private var openEndedResponses: [OpenEndedQuestionResponse] = []
     
     // Navigation state
     @State private var currentSectionIndex = 0
@@ -158,8 +174,8 @@ struct QuestionsView: View {
                                         trackVocabularyAnswer(isCorrect: isCorrect)
                                     },
                                     articleContent: articleContent,
-                                    evaluateWithLLM: { article, questionText, expectedAnswer, studentAnswer in
-                                        await evaluateWithLLM(article, questionText, expectedAnswer, studentAnswer)
+                                    evaluateWithLLM: { article, questionText, expectedAnswer, studentAnswer, questionNumber in
+                                        await evaluateWithLLM(article, questionText, expectedAnswer, studentAnswer, questionNumber)
                                     },
                                     evaluateOpenEndedAnswer: { userAnswer, expectedAnswer in
                                         evaluateOpenEndedAnswer(userAnswer, expectedAnswer)
@@ -415,6 +431,9 @@ struct QuestionsView: View {
             completed: true
         )
         
+        // Save open-ended responses as a collection
+        saveOpenEndedResponsesCollection(userId: userId)
+        
         sessionCompleted = true
     }
     
@@ -459,12 +478,99 @@ struct QuestionsView: View {
         }
     }
     
+    // Save individual open-ended question response to Firestore
+    private func saveOpenEndedResponse(_ response: OpenEndedQuestionResponse) {
+        guard let userId = Auth.auth().currentUser?.uid else { return }
+        
+        let db = Firestore.firestore()
+        
+        do {
+            let data = try JSONEncoder().encode(response)
+            var dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+            
+            // Convert timestamp to Firestore Timestamp
+            dict["timestamp"] = Timestamp(date: response.timestamp)
+            
+            // Create a unique document ID for this response
+            let documentId = "\(userId)_\(articleId)_\(response.questionNumber)"
+            
+            db.collection("open_ended_responses").document(documentId).setData(dict) { error in
+                if let error = error {
+                    print("Error saving open-ended response: \(error.localizedDescription)")
+                } else {
+                    print("Successfully saved open-ended response for question \(response.questionNumber)")
+                }
+            }
+        } catch {
+            print("Error encoding open-ended response: \(error.localizedDescription)")
+        }
+    }
+    
+    // Save open-ended responses as a collection for the session
+    private func saveOpenEndedResponsesCollection(userId: String) {
+        guard !openEndedResponses.isEmpty else { return }
+        
+        let db = Firestore.firestore()
+        let sessionId = UUID().uuidString
+        let timestamp = Date()
+        
+        // Create a batch write for all responses
+        let batch = db.batch()
+        
+        for response in openEndedResponses {
+            do {
+                let data = try JSONEncoder().encode(response)
+                var dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+                
+                // Convert timestamp to Firestore Timestamp
+                dict["timestamp"] = Timestamp(date: response.timestamp)
+                dict["sessionId"] = sessionId
+                dict["userId"] = userId
+                dict["articleId"] = articleId
+                
+                // Create document reference for this response
+                let docRef = db.collection("open_ended_sessions")
+                    .document(sessionId)
+                    .collection("responses")
+                    .document("question_\(response.questionNumber)")
+                
+                batch.setData(dict, forDocument: docRef)
+            } catch {
+                print("Error encoding response for question \(response.questionNumber): \(error.localizedDescription)")
+            }
+        }
+        
+        // Create session metadata document
+        let sessionMetadata: [String: Any] = [
+            "sessionId": sessionId,
+            "userId": userId,
+            "articleId": articleId,
+            "totalQuestions": openEndedResponses.count,
+            "correctAnswers": openEndedResponses.filter { $0.isCorrect }.count,
+            "averageScore": openEndedResponses.map { $0.score }.reduce(0, +) / Double(openEndedResponses.count),
+            "createdAt": Timestamp(date: timestamp)
+        ]
+        
+        let sessionDocRef = db.collection("open_ended_sessions").document(sessionId)
+        batch.setData(sessionMetadata, forDocument: sessionDocRef)
+        
+        // Commit the batch
+        batch.commit { error in
+            if let error = error {
+                print("Error saving open-ended session: \(error.localizedDescription)")
+            } else {
+                print("Successfully saved open-ended session with \(openEndedResponses.count) responses")
+            }
+        }
+    }
+    
     // Async function to evaluate with LLM
     private func evaluateWithLLM(
         _ article: String,
         _ questionText: String,
         _ expectedAnswer: String,
-        _ studentAnswer: String
+        _ studentAnswer: String,
+        _ questionNumber: Int
     ) async -> Bool {
         let evaluation = await llmService.evaluateOpenEndedAnswer(
             article: article,
@@ -472,6 +578,26 @@ struct QuestionsView: View {
             expectedAnswer: expectedAnswer,
             studentAnswer: studentAnswer
         )
+        
+        // Store the detailed response if evaluation is available
+        if let evaluation = evaluation {
+            let response = OpenEndedQuestionResponse(
+                questionNumber: questionNumber,
+                questionText: questionText,
+                studentAnswer: studentAnswer,
+                llmFeedback: evaluation.feedback,
+                llmReason: evaluation.reasoning,
+                score: evaluation.score,
+                isCorrect: evaluation.isCorrect,
+                timestamp: Date()
+            )
+            
+            // Add to responses array
+            openEndedResponses.append(response)
+            
+            // Save individual response to Firestore
+            saveOpenEndedResponse(response)
+        }
         
         return evaluation?.isCorrect ?? false
     }
@@ -904,7 +1030,7 @@ struct QuestionContentView: View {
     let onOpenEndedAnswer: (Bool) -> Void
     let onVocabularyAnswer: (Bool) -> Void
     let articleContent: String
-    let evaluateWithLLM: (String, String, String, String) async -> Bool
+    let evaluateWithLLM: (String, String, String, String, Int) async -> Bool
     let evaluateOpenEndedAnswer: (String, String) -> Bool
     
     var body: some View {
@@ -966,7 +1092,8 @@ struct QuestionContentView: View {
                                         articleContent,
                                         oeQuestion.questionText,
                                         expectedAnswer,
-                                        userAnswer
+                                        userAnswer,
+                                        questionIndex + 1
                                     )
                                     
                                     await MainActor.run {
