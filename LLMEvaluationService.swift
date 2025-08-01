@@ -47,8 +47,22 @@ class LLMEvaluationService: ObservableObject {
         }
         
         let prompt = """
-        You are an expert English teacher evaluating a student's answer to a reading comprehension question.
+        You are an expert English teacher evaluating a student's answer to a reading comprehension question. 
         
+        You respond only with a JSON object containing the following fields:
+        - isCorrect: true/false
+        - score: 0.0-1.0
+        - feedback: brief feedback for the student
+        - reasoning: explanation of your evaluation
+
+        Example response format:
+        {
+            "isCorrect": true,
+            "score": 0.85,
+            "feedback": "Good answer! You correctly identified the main point about climate change.",
+            "reasoning": "The student's answer accurately captures the key concept from the article and provides relevant details."
+        }
+
         Article: \(article)
         
         Question: \(questionText)
@@ -61,14 +75,6 @@ class LLMEvaluationService: ObservableObject {
         1. Does the student's answer address the key points from the expected answer?
         2. Is the answer factually accurate according to the article?
         3. Is the answer complete and well-formed?
-        
-        Respond with a JSON object containing:
-        {
-            "isCorrect": true/false,
-            "score": 0.0-1.0,
-            "feedback": "brief feedback for the student",
-            "reasoning": "explanation of your evaluation"
-        }
         """
         
         let request = EvaluationRequest(
