@@ -84,6 +84,34 @@ struct QuestionSession: Codable {
     }
 }
 
+// New combined session structure with nested collections
+struct CombinedQuestionSession: Codable {
+    let sessionId: String
+    let userId: String
+    let articleId: String
+    let totalTimeSpent: TimeInterval
+    let completed: Bool
+    let totalPoints: Int
+    let earnedPoints: Int
+    let createdAt: Date
+    let accuracy: Double
+    
+    // Nested session data for each question type
+    let multipleChoiceSession: QuestionTypeSession?
+    let openEndedSession: QuestionTypeSession?
+    let vocabularySession: QuestionTypeSession?
+}
+
+struct QuestionTypeSession: Codable {
+    let questionType: QuestionSession.QuestionType
+    let totalQuestions: Int
+    let correctAnswers: Int
+    let accuracy: Double
+    let timeSpent: TimeInterval
+    let totalPoints: Int
+    let earnedPoints: Int
+}
+
 struct WordProgress: Codable {
     let userId: String
     let word: String
@@ -216,7 +244,12 @@ class UserProgressManager: ObservableObject {
     private func saveUserProgress(_ progress: UserProgress) {
         do {
             let data = try JSONEncoder().encode(progress)
-            let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+            var dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+            
+            // Convert date fields to Firestore Timestamps
+            dict["createdAt"] = Timestamp(date: progress.createdAt)
+            dict["updatedAt"] = Timestamp(date: progress.updatedAt)
+            dict["lastActiveDate"] = Timestamp(date: progress.lastActiveDate)
             
             db.collection("user_progress").document(progress.userId).setData(dict) { [weak self] error in
                 DispatchQueue.main.async {
@@ -248,7 +281,10 @@ class UserProgressManager: ObservableObject {
     func saveReadingSession(_ session: UserReadingSession) {
         do {
             let data = try JSONEncoder().encode(session)
-            let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+            var dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+            
+            // Convert createdAt to Firestore Timestamp
+            dict["createdAt"] = Timestamp(date: session.createdAt)
             
             db.collection("reading_sessions").document(session.sessionId).setData(dict) { [weak self] error in
                 DispatchQueue.main.async {
@@ -267,7 +303,10 @@ class UserProgressManager: ObservableObject {
     func saveQuestionSession(_ session: QuestionSession) {
         do {
             let data = try JSONEncoder().encode(session)
-            let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+            var dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+            
+            // Convert createdAt to Firestore Timestamp
+            dict["createdAt"] = Timestamp(date: session.createdAt)
             
             db.collection("question_sessions").document(session.sessionId).setData(dict) { [weak self] error in
                 DispatchQueue.main.async {
@@ -317,6 +356,148 @@ class UserProgressManager: ObservableObject {
         )
         
         saveQuestionSession(session)
+    }
+    
+    // New method to save combined question session with nested collections
+    func saveCombinedQuestionSession(
+        userId: String,
+        articleId: String,
+        multipleChoiceData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)?,
+        openEndedData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)?,
+        vocabularyData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)?,
+        completed: Bool = true
+    ) {
+        let sessionId = UUID().uuidString
+        let createdAt = Date()
+        
+        // Calculate individual session data
+        var multipleChoiceSession: QuestionTypeSession?
+        var openEndedSession: QuestionTypeSession?
+        var vocabularySession: QuestionTypeSession?
+        
+        var totalPoints = 0
+        var earnedPoints = 0
+        var totalTimeSpent: TimeInterval = 0
+        var totalCorrectAnswers = 0
+        var totalQuestions = 0
+        
+        // Process multiple choice data
+        if let mcData = multipleChoiceData {
+            let (mcTotalPoints, mcEarnedPoints) = calculateQuestionSessionPoints(
+                questionType: .multipleChoice,
+                totalQuestions: mcData.totalQuestions,
+                correctAnswers: mcData.correctAnswers
+            )
+            
+            multipleChoiceSession = QuestionTypeSession(
+                questionType: .multipleChoice,
+                totalQuestions: mcData.totalQuestions,
+                correctAnswers: mcData.correctAnswers,
+                accuracy: mcData.totalQuestions > 0 ? Double(mcData.correctAnswers) / Double(mcData.totalQuestions) : 0.0,
+                timeSpent: mcData.timeSpent,
+                totalPoints: mcTotalPoints,
+                earnedPoints: mcEarnedPoints
+            )
+            
+            totalPoints += mcTotalPoints
+            earnedPoints += mcEarnedPoints
+            totalTimeSpent += mcData.timeSpent
+            totalCorrectAnswers += mcData.correctAnswers
+            totalQuestions += mcData.totalQuestions
+        }
+        
+        // Process open-ended data
+        if let oeData = openEndedData {
+            let (oeTotalPoints, oeEarnedPoints) = calculateQuestionSessionPoints(
+                questionType: .openEnded,
+                totalQuestions: oeData.totalQuestions,
+                correctAnswers: oeData.correctAnswers
+            )
+            
+            openEndedSession = QuestionTypeSession(
+                questionType: .openEnded,
+                totalQuestions: oeData.totalQuestions,
+                correctAnswers: oeData.correctAnswers,
+                accuracy: oeData.totalQuestions > 0 ? Double(oeData.correctAnswers) / Double(oeData.totalQuestions) : 0.0,
+                timeSpent: oeData.timeSpent,
+                totalPoints: oeTotalPoints,
+                earnedPoints: oeEarnedPoints
+            )
+            
+            totalPoints += oeTotalPoints
+            earnedPoints += oeEarnedPoints
+            totalTimeSpent += oeData.timeSpent
+            totalCorrectAnswers += oeData.correctAnswers
+            totalQuestions += oeData.totalQuestions
+        }
+        
+        // Process vocabulary data
+        if let vocabData = vocabularyData {
+            let (vocabTotalPoints, vocabEarnedPoints) = calculateQuestionSessionPoints(
+                questionType: .vocabulary,
+                totalQuestions: vocabData.totalQuestions,
+                correctAnswers: vocabData.correctAnswers
+            )
+            
+            vocabularySession = QuestionTypeSession(
+                questionType: .vocabulary,
+                totalQuestions: vocabData.totalQuestions,
+                correctAnswers: vocabData.correctAnswers,
+                accuracy: vocabData.totalQuestions > 0 ? Double(vocabData.correctAnswers) / Double(vocabData.totalQuestions) : 0.0,
+                timeSpent: vocabData.timeSpent,
+                totalPoints: vocabTotalPoints,
+                earnedPoints: vocabEarnedPoints
+            )
+            
+            totalPoints += vocabTotalPoints
+            earnedPoints += vocabEarnedPoints
+            totalTimeSpent += vocabData.timeSpent
+            totalCorrectAnswers += vocabData.correctAnswers
+            totalQuestions += vocabData.totalQuestions
+        }
+        
+        // Calculate overall accuracy
+        let overallAccuracy = totalQuestions > 0 ? Double(totalCorrectAnswers) / Double(totalQuestions) : 0.0
+        
+        // Create combined session
+        let combinedSession = CombinedQuestionSession(
+            sessionId: sessionId,
+            userId: userId,
+            articleId: articleId,
+            totalTimeSpent: totalTimeSpent,
+            completed: completed,
+            totalPoints: totalPoints,
+            earnedPoints: earnedPoints,
+            createdAt: createdAt,
+            accuracy: overallAccuracy,
+            multipleChoiceSession: multipleChoiceSession,
+            openEndedSession: openEndedSession,
+            vocabularySession: vocabularySession
+        )
+        
+        saveCombinedQuestionSession(combinedSession)
+    }
+    
+    private func saveCombinedQuestionSession(_ session: CombinedQuestionSession) {
+        do {
+            let data = try JSONEncoder().encode(session)
+            var dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+            
+            // Convert createdAt to Firestore Timestamp
+            dict["createdAt"] = Timestamp(date: session.createdAt)
+            
+            db.collection("question_sessions").document(session.sessionId).setData(dict) { [weak self] error in
+                DispatchQueue.main.async {
+                    if let error = error {
+                        self?.errorMessage = error.localizedDescription
+                    } else {
+                        self?.updateUserProgressAfterCombinedSession(session)
+                    }
+                }
+            }
+        } catch {
+            errorMessage = "Failed to encode combined question session: \(error.localizedDescription)"
+        }
     }
     
     // MARK: - Word Progress Tracking
@@ -393,7 +574,10 @@ class UserProgressManager: ObservableObject {
     private func saveWordProgress(_ wordProgress: WordProgress) {
         do {
             let data = try JSONEncoder().encode(wordProgress)
-            let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+            var dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+            
+            // Convert lastPracticed to Firestore Timestamp
+            dict["lastPracticed"] = Timestamp(date: wordProgress.lastPracticed)
             
             let wordRef = db.collection("word_progress").document("\(wordProgress.userId)_\(wordProgress.word.lowercased())")
             wordRef.setData(dict) { [weak self] error in
@@ -436,6 +620,22 @@ class UserProgressManager: ObservableObject {
         
         progress.lastActiveDate = Date()
         progress.totalTimeSpent += session.timeSpent
+        progress.totalPoints += session.totalPoints
+        progress.earnedPoints += session.earnedPoints
+        
+        // Update streak
+        progress.streakDays = calculateStreakDays(currentDate: Date(), lastActive: progress.lastActiveDate, currentStreak: progress.streakDays)
+        
+        progress.updatedAt = Date()
+        
+        saveUserProgress(progress)
+    }
+    
+    private func updateUserProgressAfterCombinedSession(_ session: CombinedQuestionSession) {
+        guard var progress = currentProgress else { return }
+        
+        progress.lastActiveDate = Date()
+        progress.totalTimeSpent += session.totalTimeSpent
         progress.totalPoints += session.totalPoints
         progress.earnedPoints += session.earnedPoints
         

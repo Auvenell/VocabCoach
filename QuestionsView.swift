@@ -9,6 +9,8 @@ struct QuestionsView: View {
     @StateObject private var viewModel = ArticleViewModel()
     @StateObject private var speechManager = SpeechRecognitionManager()
     @StateObject private var progressManager = UserProgressManager()
+    @StateObject private var llmService = LLMEvaluationService()
+    @State private var articleContent: String = ""
     @EnvironmentObject var headerState: HeaderState
     @Environment(\.dismiss) private var dismiss
     @State private var isLoading = true
@@ -154,6 +156,13 @@ struct QuestionsView: View {
                                     },
                                     onVocabularyAnswer: { isCorrect in
                                         trackVocabularyAnswer(isCorrect: isCorrect)
+                                    },
+                                    articleContent: articleContent,
+                                    evaluateWithLLM: { article, questionText, expectedAnswer, studentAnswer in
+                                        await evaluateWithLLM(article, questionText, expectedAnswer, studentAnswer)
+                                    },
+                                    evaluateOpenEndedAnswer: { userAnswer, expectedAnswer in
+                                        evaluateOpenEndedAnswer(userAnswer, expectedAnswer)
                                     }
                                 )
                             }
@@ -242,6 +251,9 @@ struct QuestionsView: View {
             
             // Start question session tracking
             startQuestionSession()
+            
+            // Fetch article content for LLM evaluation
+            fetchArticleContent()
             
             // Add a slight delay to show loading spinner
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -371,44 +383,37 @@ struct QuestionsView: View {
         
         let timeSpent = Date().timeIntervalSince(startTime)
         
-        // Save multiple choice session if there were questions
-        if !viewModel.multipleChoiceQuestions.isEmpty {
-            progressManager.saveQuestionSessionWithPoints(
-                userId: userId,
-                articleId: articleId,
-                questionType: .multipleChoice,
+        // Prepare data for each question type
+        let multipleChoiceData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)? = 
+            !viewModel.multipleChoiceQuestions.isEmpty ? (
                 totalQuestions: viewModel.multipleChoiceQuestions.count,
                 correctAnswers: multipleChoiceCorrect,
-                timeSpent: timeSpent * Double(viewModel.multipleChoiceQuestions.count) / Double(getTotalQuestions()),
-                completed: true
-            )
-        }
+                timeSpent: timeSpent * Double(viewModel.multipleChoiceQuestions.count) / Double(getTotalQuestions())
+            ) : nil
         
-        // Save open-ended session if there were questions
-        if !viewModel.openEndedQuestions.isEmpty {
-            progressManager.saveQuestionSessionWithPoints(
-                userId: userId,
-                articleId: articleId,
-                questionType: .openEnded,
+        let openEndedData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)? = 
+            !viewModel.openEndedQuestions.isEmpty ? (
                 totalQuestions: viewModel.openEndedQuestions.count,
                 correctAnswers: openEndedCorrect,
-                timeSpent: timeSpent * Double(viewModel.openEndedQuestions.count) / Double(getTotalQuestions()),
-                completed: true
-            )
-        }
+                timeSpent: timeSpent * Double(viewModel.openEndedQuestions.count) / Double(getTotalQuestions())
+            ) : nil
         
-        // Save vocabulary session if there were questions
-        if !vocabularyWords.isEmpty {
-            progressManager.saveQuestionSessionWithPoints(
-                userId: userId,
-                articleId: articleId,
-                questionType: .vocabulary,
+        let vocabularyData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)? = 
+            !vocabularyWords.isEmpty ? (
                 totalQuestions: vocabularyWords.count,
                 correctAnswers: vocabularyCorrect,
-                timeSpent: timeSpent * Double(vocabularyWords.count) / Double(getTotalQuestions()),
-                completed: true
-            )
-        }
+                timeSpent: timeSpent * Double(vocabularyWords.count) / Double(getTotalQuestions())
+            ) : nil
+        
+        // Save combined session with nested collections
+        progressManager.saveCombinedQuestionSession(
+            userId: userId,
+            articleId: articleId,
+            multipleChoiceData: multipleChoiceData,
+            openEndedData: openEndedData,
+            vocabularyData: vocabularyData,
+            completed: true
+        )
         
         sessionCompleted = true
     }
@@ -425,6 +430,50 @@ struct QuestionsView: View {
         return viewModel.multipleChoiceQuestions.count + 
                viewModel.openEndedQuestions.count + 
                vocabularyWords.count
+    }
+    
+    // Evaluate open-ended answer using LLM
+    private func evaluateOpenEndedAnswer(_ userAnswer: String, _ expectedAnswer: String) -> Bool {
+        // For now, return a simple evaluation
+        // In the future, this will call the LLM service
+        let userAnswerLower = userAnswer.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let expectedAnswerLower = expectedAnswer.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Simple keyword matching for now
+        let userWords = Set(userAnswerLower.components(separatedBy: .whitespaces))
+        let expectedWords = Set(expectedAnswerLower.components(separatedBy: .whitespaces))
+        
+        let commonWords = userWords.intersection(expectedWords)
+        let similarity = Double(commonWords.count) / Double(max(expectedWords.count, 1))
+        
+        return similarity >= 0.3 // 30% keyword overlap
+    }
+    
+    // Fetch article content for LLM evaluation
+    private func fetchArticleContent() {
+        let db = Firestore.firestore()
+        db.collection("articles").document(articleId).getDocument { snapshot, error in
+            if let data = snapshot?.data() {
+                self.articleContent = data["content"] as? String ?? ""
+            }
+        }
+    }
+    
+    // Async function to evaluate with LLM
+    private func evaluateWithLLM(
+        _ article: String,
+        _ questionText: String,
+        _ expectedAnswer: String,
+        _ studentAnswer: String
+    ) async -> Bool {
+        let evaluation = await llmService.evaluateOpenEndedAnswer(
+            article: article,
+            questionText: questionText,
+            expectedAnswer: expectedAnswer,
+            studentAnswer: studentAnswer
+        )
+        
+        return evaluation?.isCorrect ?? false
     }
     
     // Check if all questions are completed
@@ -522,6 +571,26 @@ struct QuestionsView: View {
             // Word not found in dictionary - could show an alert or just ignore
             print("No dictionary definition found for: \(cleanWord)")
         }
+    }
+    
+    // Helper function to get the correct answer text from the choice reference
+    private func getCorrectAnswerText(for question: MultipleChoiceQuestion) -> String {
+        // The answer field contains "choice_a", "choice_b", etc.
+        // We need to map this to the actual choice text
+        let choiceMapping = [
+            "choice_a": 0,
+            "choice_b": 1,
+            "choice_c": 2,
+            "choice_d": 3
+        ]
+        
+        guard let choiceIndex = choiceMapping[question.answer],
+              choiceIndex < question.choices.count else {
+            print("Invalid choice reference: \(question.answer)")
+            return ""
+        }
+        
+        return question.choices[choiceIndex]
     }
 }
 
@@ -833,6 +902,9 @@ struct QuestionContentView: View {
     let onMultipleChoiceAnswer: (Bool) -> Void
     let onOpenEndedAnswer: (Bool) -> Void
     let onVocabularyAnswer: (Bool) -> Void
+    let articleContent: String
+    let evaluateWithLLM: (String, String, String, String) async -> Bool
+    let evaluateOpenEndedAnswer: (String, String) -> Bool
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -847,8 +919,17 @@ struct QuestionContentView: View {
                         onAnswerSelected: { answer in
                             selectedAnswers[mcQuestion.questionText] = answer
                             // Track if answer is correct
-                            let isCorrect = answer == mcQuestion.answer
+                            // Convert the answer reference (A, B, C, D) to the actual choice text
+                            let correctAnswerText = getCorrectAnswerText(for: mcQuestion)
+                            let isCorrect = answer == correctAnswerText
                             onMultipleChoiceAnswer(isCorrect)
+                            
+                            // Debug logging
+                            print("Multiple Choice Question: \(mcQuestion.questionText)")
+                            print("Selected Answer: \(answer)")
+                            print("Correct Answer Reference: \(mcQuestion.answer)")
+                            print("Correct Answer Text: \(correctAnswerText)")
+                            print("Is Correct: \(isCorrect)")
                         }
                     )
                 }
@@ -873,9 +954,41 @@ struct QuestionContentView: View {
                         },
                         onLockAnswer: {
                             lockAnswer(for: oeQuestion.questionText)
-                            // Track open-ended answer as correct if it has content
-                            let hasAnswer = !(openEndedAnswers[oeQuestion.questionText] ?? "").isEmpty
-                            onOpenEndedAnswer(hasAnswer)
+                            // Evaluate open-ended answer using LLM
+                            let userAnswer = openEndedAnswers[oeQuestion.questionText] ?? ""
+                            let expectedAnswer = oeQuestion.answer
+                            
+                            // Use LLM evaluation if article content is available
+                            if !articleContent.isEmpty {
+                                Task {
+                                    let isCorrect = await evaluateWithLLM(
+                                        articleContent,
+                                        oeQuestion.questionText,
+                                        expectedAnswer,
+                                        userAnswer
+                                    )
+                                    
+                                    await MainActor.run {
+                                        onOpenEndedAnswer(isCorrect)
+                                        
+                                        // Debug logging
+                                        print("Open-Ended Question (LLM): \(oeQuestion.questionText)")
+                                        print("User Answer: \(userAnswer)")
+                                        print("Expected Answer: \(expectedAnswer)")
+                                        print("Is Correct: \(isCorrect)")
+                                    }
+                                }
+                            } else {
+                                // Fallback to simple evaluation
+                                let isCorrect = evaluateOpenEndedAnswer(userAnswer, expectedAnswer)
+                                onOpenEndedAnswer(isCorrect)
+                                
+                                // Debug logging
+                                print("Open-Ended Question (Simple): \(oeQuestion.questionText)")
+                                print("User Answer: \(userAnswer)")
+                                print("Expected Answer: \(expectedAnswer)")
+                                print("Is Correct: \(isCorrect)")
+                            }
                         },
                         onUnlockAnswer: {
                             unlockAnswer(for: oeQuestion.questionText)
