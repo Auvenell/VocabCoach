@@ -96,7 +96,8 @@ struct ReadingSession {
     private mutating func initializeWordAnalyses() {
         wordAnalyses = paragraph.words.enumerated().map { index, word in
             let isImportant = WordClassifier.isImportantWord(word)
-            let isProperNoun = WordMatcher.shared.isProperNoun(word)
+            let isFirstInSentence = isFirstWordOfSentence(index)
+            let isProperNoun = isFirstInSentence ? false : WordMatcher.shared.isProperNoun(word)
 
             return WordAnalysis(
                 word: word,
@@ -146,7 +147,8 @@ struct ReadingSession {
         if currentWordIndex < wordAnalyses.count {
             let currentWord = paragraph.words[currentWordIndex]
             let isImportant = WordClassifier.isImportantWord(currentWord)
-            let isProperNoun = WordMatcher.shared.isProperNoun(currentWord)
+            let isFirstInSentence = isFirstWordOfSentence(currentWordIndex)
+            let isProperNoun = isFirstInSentence ? false : WordMatcher.shared.isProperNoun(currentWord)
 
             wordAnalyses[currentWordIndex] = WordAnalysis(
                 word: currentWord,
@@ -298,6 +300,7 @@ struct ReadingSession {
         // Reset word analyses for words from sentence start onwards
         for i in sentenceStart ..< wordAnalyses.count {
             let word = paragraph.words[i]
+            let isFirstInSentence = isFirstWordOfSentence(i)
             wordAnalyses[i] = WordAnalysis(
                 word: word,
                 expectedIndex: i,
@@ -307,7 +310,7 @@ struct ReadingSession {
                 isMispronounced: false,
                 isCurrentWord: i == sentenceStart,
                 isImportantWord: WordClassifier.isImportantWord(word),
-                isProperNoun: WordMatcher.shared.isProperNoun(word)
+                isProperNoun: isFirstInSentence ? false : WordMatcher.shared.isProperNoun(word)
             )
         }
 
