@@ -64,15 +64,19 @@ struct ProgressDashboardView: View {
                 await loadProgressData()
             }
             .onAppear {
-                loadProgressData()
+                Task {
+                    await loadProgressData()
+                }
             }
         }
     }
     
-    private func loadProgressData() {
+    private func loadProgressData() async {
         guard let userId = Auth.auth().currentUser?.uid else { return }
         
-        isLoading = true
+        await MainActor.run {
+            isLoading = true
+        }
         
         // Load weekly stats
         progressManager.getWeeklyProgress(userId: userId) { stats in

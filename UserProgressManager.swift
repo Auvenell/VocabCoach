@@ -175,15 +175,23 @@ class UserProgressManager: ObservableObject {
     
     private let db = Firestore.firestore()
     private var cancellables = Set<AnyCancellable>()
+    private var authStateListener: AuthStateDidChangeListenerHandle?
     
     init() {
         setupAuthListener()
     }
     
+    deinit {
+        // Remove the auth state listener when the object is deallocated
+        if let listener = authStateListener {
+            Auth.auth().removeStateDidChangeListener(listener)
+        }
+    }
+    
     // MARK: - Authentication Listener
     
     private func setupAuthListener() {
-        Auth.auth().addStateDidChangeListener { [weak self] _, user in
+        authStateListener = Auth.auth().addStateDidChangeListener { [weak self] _, user in
             if let user = user {
                 self?.loadUserProgress(userId: user.uid)
             } else {

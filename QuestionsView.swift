@@ -573,25 +573,26 @@ struct QuestionsView: View {
         }
     }
     
-    // Helper function to get the correct answer text from the choice reference
-    private func getCorrectAnswerText(for question: MultipleChoiceQuestion) -> String {
-        // The answer field contains "choice_a", "choice_b", etc.
-        // We need to map this to the actual choice text
-        let choiceMapping = [
-            "choice_a": 0,
-            "choice_b": 1,
-            "choice_c": 2,
-            "choice_d": 3
-        ]
-        
-        guard let choiceIndex = choiceMapping[question.answer],
-              choiceIndex < question.choices.count else {
-            print("Invalid choice reference: \(question.answer)")
-            return ""
-        }
-        
-        return question.choices[choiceIndex]
+}
+
+// Helper function to get the correct answer text from the choice reference
+private func getCorrectAnswerText(for question: MultipleChoiceQuestion) -> String {
+    // The answer field contains "choice_a", "choice_b", etc.
+    // We need to map this to the actual choice text
+    let choiceMapping = [
+        "choice_a": 0,
+        "choice_b": 1,
+        "choice_c": 2,
+        "choice_d": 3
+    ]
+    
+    guard let choiceIndex = choiceMapping[question.answer],
+          choiceIndex < question.choices.count else {
+        print("Invalid choice reference: \(question.answer)")
+        return ""
     }
+    
+    return question.choices[choiceIndex]
 }
 
 // MARK: - Results View
