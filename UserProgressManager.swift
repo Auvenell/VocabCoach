@@ -12,6 +12,8 @@ struct UserProgress: Codable {
     var totalWordsCorrect: Int
     var averageAccuracy: Double
     var totalTimeSpent: TimeInterval
+    var totalPoints: Int
+    var earnedPoints: Int
     var lastActiveDate: Date
     var streakDays: Int
     var level: UserLevel
@@ -63,12 +65,22 @@ struct QuestionSession: Codable {
     let accuracy: Double
     let timeSpent: TimeInterval
     let completed: Bool
+    let totalPoints: Int
+    let earnedPoints: Int
     let createdAt: Date
     
     enum QuestionType: String, Codable {
         case multipleChoice = "multiple_choice"
         case openEnded = "open_ended"
         case vocabulary = "vocabulary"
+        
+        var pointsPerQuestion: Int {
+            switch self {
+            case .multipleChoice: return 8
+            case .openEnded: return 10
+            case .vocabulary: return 2
+            }
+        }
     }
 }
 
@@ -189,6 +201,8 @@ class UserProgressManager: ObservableObject {
             totalWordsCorrect: 0,
             averageAccuracy: 0.0,
             totalTimeSpent: 0,
+            totalPoints: 0,
+            earnedPoints: 0,
             lastActiveDate: Date(),
             streakDays: 0,
             level: .beginner,
@@ -219,6 +233,17 @@ class UserProgressManager: ObservableObject {
     }
     
     // MARK: - Session Tracking
+    
+    // Helper function to calculate points for question sessions
+    func calculateQuestionSessionPoints(
+        questionType: QuestionSession.QuestionType,
+        totalQuestions: Int,
+        correctAnswers: Int
+    ) -> (totalPoints: Int, earnedPoints: Int) {
+        let totalPoints = totalQuestions * questionType.pointsPerQuestion
+        let earnedPoints = correctAnswers * questionType.pointsPerQuestion
+        return (totalPoints, earnedPoints)
+    }
     
     func saveReadingSession(_ session: UserReadingSession) {
         do {
@@ -256,6 +281,42 @@ class UserProgressManager: ObservableObject {
         } catch {
             errorMessage = "Failed to encode question session: \(error.localizedDescription)"
         }
+    }
+    
+    // Convenience function to create and save question sessions with points
+    func saveQuestionSessionWithPoints(
+        userId: String,
+        articleId: String,
+        questionType: QuestionSession.QuestionType,
+        totalQuestions: Int,
+        correctAnswers: Int,
+        timeSpent: TimeInterval,
+        completed: Bool = true
+    ) {
+        let (totalPoints, earnedPoints) = calculateQuestionSessionPoints(
+            questionType: questionType,
+            totalQuestions: totalQuestions,
+            correctAnswers: correctAnswers
+        )
+        
+        let accuracy = totalQuestions > 0 ? Double(correctAnswers) / Double(totalQuestions) : 0.0
+        
+        let session = QuestionSession(
+            sessionId: UUID().uuidString,
+            userId: userId,
+            articleId: articleId,
+            questionType: questionType,
+            totalQuestions: totalQuestions,
+            correctAnswers: correctAnswers,
+            accuracy: accuracy,
+            timeSpent: timeSpent,
+            completed: completed,
+            totalPoints: totalPoints,
+            earnedPoints: earnedPoints,
+            createdAt: Date()
+        )
+        
+        saveQuestionSession(session)
     }
     
     // MARK: - Word Progress Tracking
@@ -375,6 +436,8 @@ class UserProgressManager: ObservableObject {
         
         progress.lastActiveDate = Date()
         progress.totalTimeSpent += session.timeSpent
+        progress.totalPoints += session.totalPoints
+        progress.earnedPoints += session.earnedPoints
         
         // Update streak
         progress.streakDays = calculateStreakDays(currentDate: Date(), lastActive: progress.lastActiveDate, currentStreak: progress.streakDays)

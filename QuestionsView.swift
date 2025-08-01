@@ -1,4 +1,5 @@
 import FirebaseFirestore
+import FirebaseAuth
 import SwiftUI
 import UIKit
 
@@ -7,6 +8,7 @@ struct QuestionsView: View {
     let practiceSession: ReadingSession? // Optional practice session data
     @StateObject private var viewModel = ArticleViewModel()
     @StateObject private var speechManager = SpeechRecognitionManager()
+    @StateObject private var progressManager = UserProgressManager()
     @EnvironmentObject var headerState: HeaderState
     @Environment(\.dismiss) private var dismiss
     @State private var isLoading = true
@@ -24,6 +26,15 @@ struct QuestionsView: View {
     @State private var vocabularyLockedAnswers: Set<String> = [] // word -> locked status
     @State private var recordingVocabularyWord: String? = nil // which vocabulary word is currently being recorded
     @State private var showingArticle = false // for showing article in bottom sheet
+    
+    // Question session tracking
+    @State private var sessionStartTime: Date?
+    @State private var multipleChoiceCorrect: Int = 0
+    @State private var openEndedCorrect: Int = 0
+    @State private var vocabularyCorrect: Int = 0
+    @State private var sessionCompleted: Bool = false
+    @State private var showingSubmitButton: Bool = false
+    @State private var showingResults: Bool = false
     
     // Navigation state
     @State private var currentSectionIndex = 0
@@ -119,7 +130,7 @@ struct QuestionsView: View {
                             if let section = currentSection, let question = currentQuestion {
                                 QuestionContentView(
                                     section: section,
-                                        question: question,
+                                    question: question,
                                     questionIndex: currentQuestionIndex,
                                     selectedAnswers: $selectedAnswers,
                                     openEndedAnswers: $openEndedAnswers,
@@ -132,8 +143,17 @@ struct QuestionsView: View {
                                     recordingVocabularyWord: $recordingVocabularyWord,
                                     speechManager: speechManager,
                                     onWordTap: { word in
-                                                selectedWord = word
-                                                showDictionary(for: word)
+                                        selectedWord = word
+                                        showDictionary(for: word)
+                                    },
+                                    onMultipleChoiceAnswer: { isCorrect in
+                                        trackMultipleChoiceAnswer(isCorrect: isCorrect)
+                                    },
+                                    onOpenEndedAnswer: { isCorrect in
+                                        trackOpenEndedAnswer(isCorrect: isCorrect)
+                                    },
+                                    onVocabularyAnswer: { isCorrect in
+                                        trackVocabularyAnswer(isCorrect: isCorrect)
                                     }
                                 )
                             }
@@ -151,12 +171,52 @@ struct QuestionsView: View {
                             showingArticle = true
                         }
                     )
+                    
+                    // Submit button (show when all questions completed)
+                    if allQuestionsCompleted && !sessionCompleted {
+                        VStack(spacing: 12) {
+                            Button(action: submitAnswers) {
+                                HStack {
+                                    Image(systemName: "checkmark.circle.fill")
+                                    Text("Submit Answers")
+                                }
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color.green)
+                                .cornerRadius(12)
+                            }
+                            
+                            Text("All questions completed! Review your answers and submit.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.horizontal)
+                    }
                 }
             }
         }
         .navigationBarHidden(true)
         .sheet(isPresented: $showingArticle) {
             ArticleView(articleId: articleId, practiceSession: practiceSession)
+        }
+        .sheet(isPresented: $showingResults) {
+            QuestionResultsView(
+                totalPointsEarned: totalPointsEarned,
+                totalPossiblePoints: totalPossiblePoints,
+                multipleChoiceCorrect: multipleChoiceCorrect,
+                multipleChoiceTotal: viewModel.multipleChoiceQuestions.count,
+                openEndedCorrect: openEndedCorrect,
+                openEndedTotal: viewModel.openEndedQuestions.count,
+                vocabularyCorrect: vocabularyCorrect,
+                vocabularyTotal: vocabularyWords.count,
+                onDismiss: {
+                    showingResults = false
+                    dismiss()
+                }
+            )
         }
         .onAppear {
             // Set up header
@@ -179,6 +239,10 @@ struct QuestionsView: View {
             } else {
                 vocabularyWords = getImportantWordsFromArticle()
             }
+            
+            // Start question session tracking
+            startQuestionSession()
+            
             // Add a slight delay to show loading spinner
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 isLoading = false
@@ -188,6 +252,11 @@ struct QuestionsView: View {
             updateHeaderTitle()
         }
         .onDisappear {
+            // Save question sessions if not already completed
+            if !sessionCompleted {
+                saveQuestionSessions()
+            }
+            
             // Restore practice view header when leaving questions view
             headerState.showBackButton = false
             headerState.title = "Reading"
@@ -268,6 +337,129 @@ struct QuestionsView: View {
         vocabularyLockedAnswers.remove(word)
     }
     
+    // MARK: - Question Session Tracking
+    
+    private func startQuestionSession() {
+        sessionStartTime = Date()
+        multipleChoiceCorrect = 0
+        openEndedCorrect = 0
+        vocabularyCorrect = 0
+        sessionCompleted = false
+    }
+    
+    private func trackMultipleChoiceAnswer(isCorrect: Bool) {
+        if isCorrect {
+            multipleChoiceCorrect += 1
+        }
+    }
+    
+    private func trackOpenEndedAnswer(isCorrect: Bool) {
+        if isCorrect {
+            openEndedCorrect += 1
+        }
+    }
+    
+    private func trackVocabularyAnswer(isCorrect: Bool) {
+        if isCorrect {
+            vocabularyCorrect += 1
+        }
+    }
+    
+    private func saveQuestionSessions() {
+        guard let userId = Auth.auth().currentUser?.uid,
+              let startTime = sessionStartTime else { return }
+        
+        let timeSpent = Date().timeIntervalSince(startTime)
+        
+        // Save multiple choice session if there were questions
+        if !viewModel.multipleChoiceQuestions.isEmpty {
+            progressManager.saveQuestionSessionWithPoints(
+                userId: userId,
+                articleId: articleId,
+                questionType: .multipleChoice,
+                totalQuestions: viewModel.multipleChoiceQuestions.count,
+                correctAnswers: multipleChoiceCorrect,
+                timeSpent: timeSpent * Double(viewModel.multipleChoiceQuestions.count) / Double(getTotalQuestions()),
+                completed: true
+            )
+        }
+        
+        // Save open-ended session if there were questions
+        if !viewModel.openEndedQuestions.isEmpty {
+            progressManager.saveQuestionSessionWithPoints(
+                userId: userId,
+                articleId: articleId,
+                questionType: .openEnded,
+                totalQuestions: viewModel.openEndedQuestions.count,
+                correctAnswers: openEndedCorrect,
+                timeSpent: timeSpent * Double(viewModel.openEndedQuestions.count) / Double(getTotalQuestions()),
+                completed: true
+            )
+        }
+        
+        // Save vocabulary session if there were questions
+        if !vocabularyWords.isEmpty {
+            progressManager.saveQuestionSessionWithPoints(
+                userId: userId,
+                articleId: articleId,
+                questionType: .vocabulary,
+                totalQuestions: vocabularyWords.count,
+                correctAnswers: vocabularyCorrect,
+                timeSpent: timeSpent * Double(vocabularyWords.count) / Double(getTotalQuestions()),
+                completed: true
+            )
+        }
+        
+        sessionCompleted = true
+    }
+    
+    private func submitAnswers() {
+        // Save all question sessions
+        saveQuestionSessions()
+        
+        // Show results
+        showingResults = true
+    }
+    
+    private func getTotalQuestions() -> Int {
+        return viewModel.multipleChoiceQuestions.count + 
+               viewModel.openEndedQuestions.count + 
+               vocabularyWords.count
+    }
+    
+    // Check if all questions are completed
+    private var allQuestionsCompleted: Bool {
+        let multipleChoiceCompleted = viewModel.multipleChoiceQuestions.allSatisfy { question in
+            selectedAnswers[question.questionText] != nil
+        }
+        
+        let openEndedCompleted = viewModel.openEndedQuestions.allSatisfy { question in
+            !(openEndedAnswers[question.questionText] ?? "").isEmpty
+        }
+        
+        let vocabularyCompleted = vocabularyWords.allSatisfy { word in
+            !(vocabularyAnswers[word] ?? "").isEmpty
+        }
+        
+        return multipleChoiceCompleted && openEndedCompleted && vocabularyCompleted
+    }
+    
+    // Calculate total points earned
+    private var totalPointsEarned: Int {
+        let multipleChoicePoints = multipleChoiceCorrect * 8
+        let openEndedPoints = openEndedCorrect * 10
+        let vocabularyPoints = vocabularyCorrect * 2
+        return multipleChoicePoints + openEndedPoints + vocabularyPoints
+    }
+    
+    // Calculate total possible points
+    private var totalPossiblePoints: Int {
+        let multipleChoiceTotal = viewModel.multipleChoiceQuestions.count * 8
+        let openEndedTotal = viewModel.openEndedQuestions.count * 10
+        let vocabularyTotal = vocabularyWords.count * 2
+        return multipleChoiceTotal + openEndedTotal + vocabularyTotal
+    }
+    
     // Update header title based on current section
     private func updateHeaderTitle() {
         if let section = currentSection {
@@ -330,6 +522,158 @@ struct QuestionsView: View {
             // Word not found in dictionary - could show an alert or just ignore
             print("No dictionary definition found for: \(cleanWord)")
         }
+    }
+}
+
+// MARK: - Results View
+
+struct QuestionResultsView: View {
+    let totalPointsEarned: Int
+    let totalPossiblePoints: Int
+    let multipleChoiceCorrect: Int
+    let multipleChoiceTotal: Int
+    let openEndedCorrect: Int
+    let openEndedTotal: Int
+    let vocabularyCorrect: Int
+    let vocabularyTotal: Int
+    let onDismiss: () -> Void
+    
+    private var accuracy: Double {
+        guard totalPossiblePoints > 0 else { return 0.0 }
+        return Double(totalPointsEarned) / Double(totalPossiblePoints)
+    }
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 24) {
+                // Header
+                VStack(spacing: 8) {
+                    Image(systemName: "trophy.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(.orange)
+                    
+                    Text("Quiz Complete!")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                    
+                    Text("Great job completing all the questions!")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                
+                // Points Summary
+                VStack(spacing: 16) {
+                    HStack {
+                        Text("Total Points")
+                            .font(.headline)
+                        Spacer()
+                        Text("\(totalPointsEarned)/\(totalPossiblePoints)")
+                            .font(.headline)
+                            .foregroundColor(.blue)
+                    }
+                    
+                    ProgressView(value: accuracy)
+                        .progressViewStyle(LinearProgressViewStyle(tint: .blue))
+                    
+                    Text("\(Int(accuracy * 100))% Accuracy")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+                
+                // Detailed Results
+                VStack(spacing: 12) {
+                    ResultRow(
+                        title: "Multiple Choice",
+                        correct: multipleChoiceCorrect,
+                        total: multipleChoiceTotal,
+                        pointsPerQuestion: 8,
+                        color: .blue
+                    )
+                    
+                    ResultRow(
+                        title: "Open-Ended",
+                        correct: openEndedCorrect,
+                        total: openEndedTotal,
+                        pointsPerQuestion: 10,
+                        color: .green
+                    )
+                    
+                    ResultRow(
+                        title: "Vocabulary",
+                        correct: vocabularyCorrect,
+                        total: vocabularyTotal,
+                        pointsPerQuestion: 2,
+                        color: .orange
+                    )
+                }
+                
+                Spacer()
+                
+                // Dismiss Button
+                Button(action: onDismiss) {
+                    Text("Continue")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.blue)
+                        .cornerRadius(12)
+                }
+                .padding(.horizontal)
+            }
+            .padding()
+            .navigationBarHidden(true)
+        }
+    }
+}
+
+struct ResultRow: View {
+    let title: String
+    let correct: Int
+    let total: Int
+    let pointsPerQuestion: Int
+    let color: Color
+    
+    private var pointsEarned: Int {
+        return correct * pointsPerQuestion
+    }
+    
+    private var totalPoints: Int {
+        return total * pointsPerQuestion
+    }
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                
+                Text("\(correct)/\(total) correct")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 4) {
+                Text("\(pointsEarned) pts")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(color)
+                
+                Text("of \(totalPoints)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .background(color.opacity(0.1))
+        .cornerRadius(8)
     }
 }
 
@@ -486,6 +830,9 @@ struct QuestionContentView: View {
     @Binding var recordingVocabularyWord: String?
     let speechManager: SpeechRecognitionManager
     let onWordTap: (String) -> Void
+    let onMultipleChoiceAnswer: (Bool) -> Void
+    let onOpenEndedAnswer: (Bool) -> Void
+    let onVocabularyAnswer: (Bool) -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -499,6 +846,9 @@ struct QuestionContentView: View {
                         selectedAnswer: selectedAnswers[mcQuestion.questionText],
                         onAnswerSelected: { answer in
                             selectedAnswers[mcQuestion.questionText] = answer
+                            // Track if answer is correct
+                            let isCorrect = answer == mcQuestion.answer
+                            onMultipleChoiceAnswer(isCorrect)
                         }
                     )
                 }
@@ -523,6 +873,9 @@ struct QuestionContentView: View {
                         },
                         onLockAnswer: {
                             lockAnswer(for: oeQuestion.questionText)
+                            // Track open-ended answer as correct if it has content
+                            let hasAnswer = !(openEndedAnswers[oeQuestion.questionText] ?? "").isEmpty
+                            onOpenEndedAnswer(hasAnswer)
                         },
                         onUnlockAnswer: {
                             unlockAnswer(for: oeQuestion.questionText)
@@ -553,6 +906,9 @@ struct QuestionContentView: View {
                         },
                         onLockAnswer: {
                             lockVocabularyAnswer(for: word)
+                            // Track vocabulary answer as correct if it has content
+                            let hasAnswer = !(vocabularyAnswers[word] ?? "").isEmpty
+                            onVocabularyAnswer(hasAnswer)
                         },
                         onUnlockAnswer: {
                             unlockVocabularyAnswer(for: word)
