@@ -286,6 +286,16 @@ class UserProgressManager: ObservableObject {
         return (totalPoints, earnedPoints)
     }
     
+    // Helper function to calculate points for open-ended questions based on scores
+    func calculateOpenEndedSessionPoints(
+        totalQuestions: Int,
+        scores: [Double]
+    ) -> (totalPoints: Int, earnedPoints: Int) {
+        let totalPoints = totalQuestions * QuestionSession.QuestionType.openEnded.pointsPerQuestion
+        let earnedPoints = Int(scores.reduce(0, +) * Double(QuestionSession.QuestionType.openEnded.pointsPerQuestion))
+        return (totalPoints, earnedPoints)
+    }
+    
     func saveReadingSession(_ session: UserReadingSession) {
         do {
             let data = try JSONEncoder().encode(session)
@@ -371,7 +381,7 @@ class UserProgressManager: ObservableObject {
         userId: String,
         articleId: String,
         multipleChoiceData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)?,
-        openEndedData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)?,
+        openEndedData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval, scores: [Double])?,
         vocabularyData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)?,
         completed: Bool = true
     ) -> String {
@@ -416,17 +426,19 @@ class UserProgressManager: ObservableObject {
         
         // Process open-ended data
         if let oeData = openEndedData {
-            let (oeTotalPoints, oeEarnedPoints) = calculateQuestionSessionPoints(
-                questionType: .openEnded,
+            let (oeTotalPoints, oeEarnedPoints) = calculateOpenEndedSessionPoints(
                 totalQuestions: oeData.totalQuestions,
-                correctAnswers: oeData.correctAnswers
+                scores: oeData.scores
             )
+            
+            // Calculate accuracy based on average score
+            let averageScore = oeData.scores.isEmpty ? 0.0 : oeData.scores.reduce(0, +) / Double(oeData.scores.count)
             
             openEndedSession = QuestionTypeSession(
                 questionType: .openEnded,
                 totalQuestions: oeData.totalQuestions,
                 correctAnswers: oeData.correctAnswers,
-                accuracy: oeData.totalQuestions > 0 ? Double(oeData.correctAnswers) / Double(oeData.totalQuestions) : 0.0,
+                accuracy: averageScore,
                 timeSpent: oeData.timeSpent,
                 totalPoints: oeTotalPoints,
                 earnedPoints: oeEarnedPoints
@@ -493,7 +505,7 @@ class UserProgressManager: ObservableObject {
         userId: String,
         articleId: String,
         multipleChoiceData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)?,
-        openEndedData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)?,
+        openEndedData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval, scores: [Double])?,
         vocabularyData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)?,
         completed: Bool = true
     ) {
@@ -537,17 +549,19 @@ class UserProgressManager: ObservableObject {
         
         // Process open-ended data
         if let oeData = openEndedData {
-            let (oeTotalPoints, oeEarnedPoints) = calculateQuestionSessionPoints(
-                questionType: .openEnded,
+            let (oeTotalPoints, oeEarnedPoints) = calculateOpenEndedSessionPoints(
                 totalQuestions: oeData.totalQuestions,
-                correctAnswers: oeData.correctAnswers
+                scores: oeData.scores
             )
+            
+            // Calculate accuracy based on average score
+            let averageScore = oeData.scores.isEmpty ? 0.0 : oeData.scores.reduce(0, +) / Double(oeData.scores.count)
             
             openEndedSession = QuestionTypeSession(
                 questionType: .openEnded,
                 totalQuestions: oeData.totalQuestions,
                 correctAnswers: oeData.correctAnswers,
-                accuracy: oeData.totalQuestions > 0 ? Double(oeData.correctAnswers) / Double(oeData.totalQuestions) : 0.0,
+                accuracy: averageScore,
                 timeSpent: oeData.timeSpent,
                 totalPoints: oeTotalPoints,
                 earnedPoints: oeEarnedPoints

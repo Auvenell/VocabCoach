@@ -54,32 +54,8 @@ service cloud.firestore {
     
 
     
-    // Open-ended sessions - users can only access their own sessions
-    match /open_ended_sessions/{sessionId} {
-      allow read, write: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated() && 
-        request.resource.data.userId == request.auth.uid;
-    }
-    
-    // Open-ended session responses subcollection
-    match /open_ended_sessions/{sessionId}/responses/{responseId} {
-      allow read, write: if isAuthenticated() && 
-        get(/databases/$(database)/documents/open_ended_sessions/$(sessionId)).data.userId == request.auth.uid;
-      allow create: if isAuthenticated() && 
-        get(/databases/$(database)/documents/open_ended_sessions/$(sessionId)).data.userId == request.auth.uid;
-    }
-    
-    // Nested open-ended sessions within question sessions
-    match /question_sessions/{questionSessionId}/open_ended_sessions/{sessionId} {
-      allow read, write: if isAuthenticated() && 
-        get(/databases/$(database)/documents/question_sessions/$(questionSessionId)).data.userId == request.auth.uid;
-      allow create: if isAuthenticated() && 
-        get(/databases/$(database)/documents/question_sessions/$(questionSessionId)).data.userId == request.auth.uid;
-    }
-    
-    // Nested open-ended responses within question sessions
-    match /question_sessions/{questionSessionId}/open_ended_sessions/{sessionId}/responses/{responseId} {
+    // Open-ended responses within question sessions
+    match /question_sessions/{questionSessionId}/open_ended_responses/{responseId} {
       allow read, write: if isAuthenticated() && 
         get(/databases/$(database)/documents/question_sessions/$(questionSessionId)).data.userId == request.auth.uid;
       allow create: if isAuthenticated() && 

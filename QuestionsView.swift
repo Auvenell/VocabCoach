@@ -45,7 +45,7 @@ struct QuestionsView: View {
     // Question session tracking
     @State private var sessionStartTime: Date?
     @State private var multipleChoiceCorrect: Int = 0
-    @State private var openEndedCorrect: Int = 0
+    @State private var openEndedScores: [Double] = []
     @State private var vocabularyCorrect: Int = 0
     @State private var sessionCompleted: Bool = false
     @State private var showingSubmitButton: Bool = false
@@ -168,7 +168,7 @@ struct QuestionsView: View {
                                         trackMultipleChoiceAnswer(isCorrect: isCorrect)
                                     },
                                     onOpenEndedAnswer: { isCorrect in
-                                        trackOpenEndedAnswer(isCorrect: isCorrect)
+                                        // We don't need to track here since trackOpenEndedAnswer is called in evaluateWithLLM
                                     },
                                     onVocabularyAnswer: { isCorrect in
                                         trackVocabularyAnswer(isCorrect: isCorrect)
@@ -233,7 +233,7 @@ struct QuestionsView: View {
                 totalPossiblePoints: totalPossiblePoints,
                 multipleChoiceCorrect: multipleChoiceCorrect,
                 multipleChoiceTotal: viewModel.multipleChoiceQuestions.count,
-                openEndedCorrect: openEndedCorrect,
+                openEndedCorrect: openEndedScores.filter { $0 > 0.6 }.count, // Count questions with score > 0.6
                 openEndedTotal: viewModel.openEndedQuestions.count,
                 vocabularyCorrect: vocabularyCorrect,
                 vocabularyTotal: vocabularyWords.count,
@@ -372,7 +372,7 @@ struct QuestionsView: View {
     private func startQuestionSession() {
         sessionStartTime = Date()
         multipleChoiceCorrect = 0
-        openEndedCorrect = 0
+        openEndedScores.removeAll()
         vocabularyCorrect = 0
         sessionCompleted = false
         
@@ -415,10 +415,8 @@ struct QuestionsView: View {
         }
     }
     
-    private func trackOpenEndedAnswer(isCorrect: Bool) {
-        if isCorrect {
-            openEndedCorrect += 1
-        }
+    private func trackOpenEndedAnswer(score: Double) {
+        openEndedScores.append(score)
     }
     
     private func trackVocabularyAnswer(isCorrect: Bool) {
@@ -442,11 +440,12 @@ struct QuestionsView: View {
                 timeSpent: timeSpent * Double(viewModel.multipleChoiceQuestions.count) / Double(getTotalQuestions())
             ) : nil
         
-        let openEndedData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)? = 
+        let openEndedData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval, scores: [Double])? = 
             !viewModel.openEndedQuestions.isEmpty ? (
                 totalQuestions: viewModel.openEndedQuestions.count,
-                correctAnswers: openEndedCorrect,
-                timeSpent: timeSpent * Double(viewModel.openEndedQuestions.count) / Double(getTotalQuestions())
+                correctAnswers: openEndedScores.count, // Count of answered questions
+                timeSpent: timeSpent * Double(viewModel.openEndedQuestions.count) / Double(getTotalQuestions()),
+                scores: openEndedScores
             ) : nil
         
         let vocabularyData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)? = 
@@ -559,8 +558,6 @@ struct QuestionsView: View {
         guard !openEndedResponses.isEmpty else { return }
         
         let db = Firestore.firestore()
-        let openEndedSessionId = UUID().uuidString
-        let timestamp = Date()
         
         // Create a batch write for all responses
         let batch = db.batch()
@@ -572,16 +569,13 @@ struct QuestionsView: View {
                 
                 // Convert timestamp to Firestore Timestamp
                 dict["timestamp"] = Timestamp(date: response.timestamp)
-                dict["sessionId"] = openEndedSessionId
                 dict["userId"] = userId
                 dict["articleId"] = articleId
                 
-                // Create document reference for this response within the nested structure
+                // Save to the open_ended_responses subcollection within the question session
                 let docRef = db.collection("question_sessions")
                     .document(questionSessionId)
-                    .collection("open_ended_sessions")
-                    .document(openEndedSessionId)
-                    .collection("responses")
+                    .collection("open_ended_responses")
                     .document("question_\(response.questionNumber)")
                 
                 batch.setData(dict, forDocument: docRef)
@@ -590,30 +584,12 @@ struct QuestionsView: View {
             }
         }
         
-        // Create session metadata document within the nested structure
-        let sessionMetadata: [String: Any] = [
-            "sessionId": openEndedSessionId,
-            "userId": userId,
-            "articleId": articleId,
-            "totalQuestions": openEndedResponses.count,
-            "correctAnswers": openEndedResponses.filter { $0.isCorrect }.count,
-            "averageScore": openEndedResponses.map { $0.score }.reduce(0, +) / Double(openEndedResponses.count),
-            "createdAt": Timestamp(date: timestamp)
-        ]
-        
-        let sessionDocRef = db.collection("question_sessions")
-            .document(questionSessionId)
-            .collection("open_ended_sessions")
-            .document(openEndedSessionId)
-        
-        batch.setData(sessionMetadata, forDocument: sessionDocRef)
-        
         // Commit the batch
         batch.commit { error in
             if let error = error {
-                print("Error saving open-ended session: \(error.localizedDescription)")
+                print("Error saving open-ended responses: \(error.localizedDescription)")
             } else {
-                print("Successfully saved open-ended session with \(openEndedResponses.count) responses")
+                print("Successfully saved \(openEndedResponses.count) open-ended responses")
             }
         }
     }
@@ -635,6 +611,9 @@ struct QuestionsView: View {
         
         // Store the detailed response if evaluation is available
         if let evaluation = evaluation {
+            // Determine isCorrect based on score threshold (0.6)
+            let isCorrect = evaluation.score > 0.6
+            
             let response = OpenEndedQuestionResponse(
                 questionNumber: questionNumber,
                 questionText: questionText,
@@ -642,18 +621,25 @@ struct QuestionsView: View {
                 llmFeedback: evaluation.feedback,
                 llmReason: evaluation.reasoning,
                 score: evaluation.score,
-                isCorrect: evaluation.isCorrect,
+                isCorrect: isCorrect,
                 timestamp: Date()
             )
             
             // Add to responses array
             openEndedResponses.append(response)
             
+            // Track the score for session calculation
+            trackOpenEndedAnswer(score: evaluation.score)
+            
             // Save individual response to Firestore
             saveOpenEndedResponse(response)
         }
         
-        return evaluation?.isCorrect ?? false
+        // Return the calculated isCorrect value based on score threshold
+        if let evaluation = evaluation {
+            return evaluation.score > 0.6
+        }
+        return false
     }
     
     // Check if all questions are completed
@@ -676,7 +662,7 @@ struct QuestionsView: View {
     // Calculate total points earned
     private var totalPointsEarned: Int {
         let multipleChoicePoints = multipleChoiceCorrect * 8
-        let openEndedPoints = openEndedCorrect * 10
+        let openEndedPoints = Int(openEndedScores.reduce(0, +) * 10) // Sum of scores * 10 points per question
         let vocabularyPoints = vocabularyCorrect * 2
         return multipleChoicePoints + openEndedPoints + vocabularyPoints
     }
