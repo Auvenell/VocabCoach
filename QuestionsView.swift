@@ -66,6 +66,12 @@ struct QuestionsView: View {
     // Multiple choice question responses storage
     @State private var multipleChoiceResponses: [MultipleChoiceQuestionResponse] = []
     
+    // Multiple choice section completion tracking
+    @State private var multipleChoiceSectionCompleted: Bool = false
+    
+    // Confirmation modal state
+    @State private var showingMultipleChoiceConfirmation: Bool = false
+    
     // Navigation state
     @State private var currentSectionIndex = 0
     @State private var currentQuestionIndex = 0
@@ -191,7 +197,8 @@ struct QuestionsView: View {
                                     },
                                     evaluateOpenEndedAnswer: { userAnswer, expectedAnswer in
                                         evaluateOpenEndedAnswer(userAnswer, expectedAnswer)
-                                    }
+                                    },
+                                    multipleChoiceSectionCompleted: multipleChoiceSectionCompleted
                                 )
                             }
                         }
@@ -255,6 +262,22 @@ struct QuestionsView: View {
                 }
             )
         }
+        .sheet(isPresented: $showingMultipleChoiceConfirmation) {
+            MultipleChoiceConfirmationView(
+                onConfirm: {
+                    completeMultipleChoiceSection()
+                    showingMultipleChoiceConfirmation = false
+                    // Move to next section
+                    currentSectionIndex += 1
+                    currentQuestionIndex = 0
+                },
+                onCancel: {
+                    showingMultipleChoiceConfirmation = false
+                },
+                answeredQuestions: selectedAnswers.count,
+                totalQuestions: viewModel.multipleChoiceQuestions.count
+            )
+        }
         .onAppear {
             // Set up header
             headerState.showBackButton = true
@@ -292,6 +315,11 @@ struct QuestionsView: View {
             updateHeaderTitle()
         }
         .onDisappear {
+            // Complete multiple choice section if not already completed
+            if !multipleChoiceSectionCompleted && !viewModel.multipleChoiceQuestions.isEmpty {
+                completeMultipleChoiceSection()
+            }
+            
             // Save question sessions if not already completed
             if !sessionCompleted {
                 saveQuestionSessions()
@@ -318,6 +346,12 @@ struct QuestionsView: View {
         if currentQuestionIndex < totalQuestionsInCurrentSection - 1 {
             currentQuestionIndex += 1
         } else if currentSectionIndex < sections.count - 1 {
+            // Check if we're completing the multiple choice section
+            if currentSection == .multipleChoice && !multipleChoiceSectionCompleted {
+                showingMultipleChoiceConfirmation = true
+                return
+            }
+            
             currentSectionIndex += 1
             currentQuestionIndex = 0
         }
@@ -329,6 +363,11 @@ struct QuestionsView: View {
         } else if currentSectionIndex > 0 {
             currentSectionIndex -= 1
             currentQuestionIndex = totalQuestionsInCurrentSection - 1
+            
+            // If we're going back to multiple choice section and it's completed, ensure it stays completed
+            if currentSection == .multipleChoice && multipleChoiceSectionCompleted {
+                // Section is already completed, no additional action needed
+            }
         }
     }
     
@@ -423,6 +462,9 @@ struct QuestionsView: View {
     }
     
     private func trackMultipleChoiceAnswer(isCorrect: Bool, questionNumber: Int, questionText: String, studentChoice: String, correctChoice: String) {
+        // Only track if multiple choice section is not completed
+        guard !multipleChoiceSectionCompleted else { return }
+        
         if isCorrect {
             multipleChoiceCorrect += 1
         }
@@ -437,11 +479,8 @@ struct QuestionsView: View {
             timestamp: Date()
         )
         
-        // Add to responses array
+        // Add to responses array (but don't save to Firestore yet)
         multipleChoiceResponses.append(response)
-        
-        // Save individual response to Firestore
-        saveMultipleChoiceResponse(response)
     }
     
     private func trackOpenEndedAnswer(score: Double) {
@@ -452,6 +491,21 @@ struct QuestionsView: View {
         if isCorrect {
             vocabularyCorrect += 1
         }
+    }
+    
+    // Complete multiple choice section and save responses to Firestore
+    private func completeMultipleChoiceSection() {
+        guard !multipleChoiceSectionCompleted else { return }
+        
+        multipleChoiceSectionCompleted = true
+        
+        // Save all multiple choice responses to Firestore
+        guard let userId = Auth.auth().currentUser?.uid,
+              let sessionId = questionSessionId else { return }
+        
+        saveMultipleChoiceResponsesCollection(userId: userId, questionSessionId: sessionId)
+        
+        print("Multiple choice section completed. Saved \(multipleChoiceResponses.count) responses to Firestore.")
     }
     
     private func saveQuestionSessions() {
@@ -505,6 +559,11 @@ struct QuestionsView: View {
     }
     
     private func submitAnswers() {
+        // Complete multiple choice section if not already completed
+        if !multipleChoiceSectionCompleted && !viewModel.multipleChoiceQuestions.isEmpty {
+            completeMultipleChoiceSection()
+        }
+        
         // Save all question sessions
         saveQuestionSessions()
         
@@ -1182,6 +1241,7 @@ struct QuestionContentView: View {
     let articleContent: String
     let evaluateWithLLM: (String, String, String, String, Int) async -> Bool
     let evaluateOpenEndedAnswer: (String, String) -> Bool
+    let multipleChoiceSectionCompleted: Bool
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -1193,7 +1253,14 @@ struct QuestionContentView: View {
                         question: mcQuestion,
                         questionNumber: questionIndex + 1,
                         selectedAnswer: selectedAnswers[mcQuestion.questionText],
+                        isSectionCompleted: multipleChoiceSectionCompleted,
                         onAnswerSelected: { answer in
+                            // Only allow selection if section is not completed
+                            guard !multipleChoiceSectionCompleted else { 
+                                print("Multiple choice section completed - cannot change answers")
+                                return 
+                            }
+                            
                             selectedAnswers[mcQuestion.questionText] = answer
                             // Track if answer is correct
                             // Convert the answer reference (A, B, C, D) to the actual choice text
@@ -1441,6 +1508,7 @@ struct MultipleChoiceQuestionView: View {
     let question: MultipleChoiceQuestion
     let questionNumber: Int
     let selectedAnswer: String?
+    let isSectionCompleted: Bool
     let onAnswerSelected: (String) -> Void
     
     var body: some View {
@@ -1459,6 +1527,21 @@ struct MultipleChoiceQuestionView: View {
                 
                 Text(question.questionText)
                     .font(.headline)
+            }
+            
+            // Show completion message if section is completed
+            if isSectionCompleted {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    Text("Multiple choice section completed - answers locked")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 4)
+                .padding(.horizontal, 8)
+                .background(Color.green.opacity(0.1))
+                .cornerRadius(6)
             }
             
             // Choices
@@ -1480,7 +1563,7 @@ struct MultipleChoiceQuestionView: View {
                         }) {
                             HStack {
                                 Text(choice)
-                                    .foregroundColor(.primary)
+                                    .foregroundColor(isSectionCompleted ? .secondary : .primary)
                                     .multilineTextAlignment(.leading)
                                 Spacer()
                                 if selectedAnswer == choice {
@@ -1501,6 +1584,7 @@ struct MultipleChoiceQuestionView: View {
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .disabled(isSectionCompleted)
                     }
                 }
             }
@@ -1882,6 +1966,103 @@ struct ArticleView: View {
                 // Handle case where we need to load article data
                 // This would depend on your data structure
             }
+        }
+    }
+}
+
+// MARK: - Multiple Choice Confirmation View
+
+struct MultipleChoiceConfirmationView: View {
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+    let answeredQuestions: Int
+    let totalQuestions: Int
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 24) {
+                // Header
+                VStack(spacing: 12) {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(.blue)
+                    
+                    Text("Lock Multiple Choice Answers")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    
+                    Text("You're about to complete the multiple choice section. Your answers will be locked and cannot be changed.")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    
+                    // Answer summary
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("\(answeredQuestions) of \(totalQuestions) questions answered")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.top, 4)
+                }
+                
+                // Warning message
+                VStack(spacing: 8) {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                        Text("Important")
+                            .font(.headline)
+                            .foregroundColor(.orange)
+                    }
+                    
+                    Text("Once you proceed, you won't be able to change your multiple choice answers.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding()
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(12)
+                
+                Spacer()
+                
+                // Action buttons
+                VStack(spacing: 12) {
+                    Button(action: onConfirm) {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                            Text("Yes, Lock My Answers")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.blue)
+                        .cornerRadius(12)
+                    }
+                    
+                    Button(action: onCancel) {
+                        HStack {
+                            Image(systemName: "arrow.left")
+                            Text("No, Let Me Review")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.blue)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.blue, lineWidth: 1)
+                        )
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .padding()
+            .navigationBarHidden(true)
         }
     }
 }
