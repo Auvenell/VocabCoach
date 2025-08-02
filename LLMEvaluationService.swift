@@ -24,7 +24,6 @@ class LLMEvaluationService: ObservableObject {
     }
     
     struct EvaluationResponse {
-        let isCorrect: Bool
         let score: Double // 0.0 to 1.0
         let feedback: String
         let reasoning: String
@@ -181,7 +180,6 @@ class LLMEvaluationService: ObservableObject {
                 let score = isCorrect ? 0.8 : 0.3
                 
                 return EvaluationResponse(
-                    isCorrect: isCorrect,
                     score: score,
                     feedback: "LLM evaluation completed",
                     reasoning: content
@@ -208,7 +206,6 @@ class LLMEvaluationService: ObservableObject {
         let score = isCorrect ? 0.8 : 0.3
         
         return EvaluationResponse(
-            isCorrect: isCorrect,
             score: score,
             feedback: "LLM evaluation completed",
             reasoning: response
@@ -246,13 +243,11 @@ class LLMEvaluationService: ObservableObject {
             let data = jsonString.data(using: .utf8)!
             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
             
-            let isCorrect = json?["isCorrect"] as? Bool ?? false
             let score = json?["score"] as? Double ?? 0.0
             let feedback = json?["feedback"] as? String ?? "No feedback provided"
             let reasoning = json?["reasoning"] as? String ?? "No reasoning provided"
             
             return EvaluationResponse(
-                isCorrect: isCorrect,
                 score: score,
                 feedback: feedback,
                 reasoning: reasoning

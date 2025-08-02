@@ -443,7 +443,7 @@ struct QuestionsView: View {
         let openEndedData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval, scores: [Double])? = 
             !viewModel.openEndedQuestions.isEmpty ? (
                 totalQuestions: viewModel.openEndedQuestions.count,
-                correctAnswers: openEndedScores.count, // Count of answered questions
+                correctAnswers: openEndedScores.filter { $0 > 0.6 }.count, // Count of questions with score > 0.6
                 timeSpent: timeSpent * Double(viewModel.openEndedQuestions.count) / Double(getTotalQuestions()),
                 scores: openEndedScores
             ) : nil
