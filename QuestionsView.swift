@@ -16,6 +16,15 @@ struct OpenEndedQuestionResponse: Codable {
     let timestamp: Date
 }
 
+struct MultipleChoiceQuestionResponse: Codable {
+    let questionNumber: Int
+    let questionText: String
+    let studentAnswer: String // choice_a, choice_b, choice_c, choice_d
+    let correctAnswer: String // choice_a, choice_b, choice_c, choice_d
+    let isCorrect: Bool
+    let timestamp: Date
+}
+
 struct QuestionsView: View {
     let articleId: String
     let practiceSession: ReadingSession? // Optional practice session data
@@ -53,6 +62,9 @@ struct QuestionsView: View {
     
     // Open-ended question responses storage
     @State private var openEndedResponses: [OpenEndedQuestionResponse] = []
+    
+    // Multiple choice question responses storage
+    @State private var multipleChoiceResponses: [MultipleChoiceQuestionResponse] = []
     
     // Navigation state
     @State private var currentSectionIndex = 0
@@ -164,8 +176,8 @@ struct QuestionsView: View {
                                         selectedWord = word
                                         showDictionary(for: word)
                                     },
-                                    onMultipleChoiceAnswer: { isCorrect in
-                                        trackMultipleChoiceAnswer(isCorrect: isCorrect)
+                                    onMultipleChoiceAnswer: { isCorrect, questionNumber, questionText, studentChoice, correctChoice in
+                                        trackMultipleChoiceAnswer(isCorrect: isCorrect, questionNumber: questionNumber, questionText: questionText, studentChoice: studentChoice, correctChoice: correctChoice)
                                     },
                                     onOpenEndedAnswer: { isCorrect in
                                         // We don't need to track here since trackOpenEndedAnswer is called in evaluateWithLLM
@@ -373,6 +385,7 @@ struct QuestionsView: View {
         sessionStartTime = Date()
         multipleChoiceCorrect = 0
         openEndedScores.removeAll()
+        multipleChoiceResponses.removeAll()
         vocabularyCorrect = 0
         sessionCompleted = false
         
@@ -409,10 +422,26 @@ struct QuestionsView: View {
         }
     }
     
-    private func trackMultipleChoiceAnswer(isCorrect: Bool) {
+    private func trackMultipleChoiceAnswer(isCorrect: Bool, questionNumber: Int, questionText: String, studentChoice: String, correctChoice: String) {
         if isCorrect {
             multipleChoiceCorrect += 1
         }
+        
+        // Create detailed response
+        let response = MultipleChoiceQuestionResponse(
+            questionNumber: questionNumber,
+            questionText: questionText,
+            studentAnswer: studentChoice,
+            correctAnswer: correctChoice,
+            isCorrect: isCorrect,
+            timestamp: Date()
+        )
+        
+        // Add to responses array
+        multipleChoiceResponses.append(response)
+        
+        // Save individual response to Firestore
+        saveMultipleChoiceResponse(response)
     }
     
     private func trackOpenEndedAnswer(score: Double) {
@@ -468,6 +497,9 @@ struct QuestionsView: View {
         
         // Save open-ended responses as a nested collection within the question session
         saveOpenEndedResponsesCollection(userId: userId, questionSessionId: sessionId)
+        
+        // Save multiple choice responses as a nested collection within the question session
+        saveMultipleChoiceResponsesCollection(userId: userId, questionSessionId: sessionId)
         
         sessionCompleted = true
     }
@@ -590,6 +622,84 @@ struct QuestionsView: View {
                 print("Error saving open-ended responses: \(error.localizedDescription)")
             } else {
                 print("Successfully saved \(openEndedResponses.count) open-ended responses")
+            }
+        }
+    }
+    
+    // Save individual multiple choice question response to Firestore
+    private func saveMultipleChoiceResponse(_ response: MultipleChoiceQuestionResponse) {
+        guard let userId = Auth.auth().currentUser?.uid,
+              let sessionId = questionSessionId else { return }
+        
+        let db = Firestore.firestore()
+        
+        do {
+            let data = try JSONEncoder().encode(response)
+            var dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+            
+            // Convert timestamp to Firestore Timestamp
+            dict["timestamp"] = Timestamp(date: response.timestamp)
+            
+            // Add required fields for Firestore rules
+            dict["userId"] = userId
+            dict["articleId"] = articleId
+            dict["sessionId"] = sessionId
+            
+            // Save to the multiple_choice_responses subcollection within the question session
+            let nestedDocRef = db.collection("question_sessions")
+                .document(sessionId)
+                .collection("multiple_choice_responses")
+                .document("question_\(response.questionNumber)")
+            
+            nestedDocRef.setData(dict) { error in
+                if let error = error {
+                    print("Error saving nested multiple choice response: \(error.localizedDescription)")
+                } else {
+                    print("Successfully saved nested multiple choice response for question \(response.questionNumber)")
+                }
+            }
+        } catch {
+            print("Error encoding multiple choice response: \(error.localizedDescription)")
+        }
+    }
+    
+    // Save multiple choice responses as a nested collection within the question session
+    private func saveMultipleChoiceResponsesCollection(userId: String, questionSessionId: String) {
+        guard !multipleChoiceResponses.isEmpty else { return }
+        
+        let db = Firestore.firestore()
+        
+        // Create a batch write for all responses
+        let batch = db.batch()
+        
+        for response in multipleChoiceResponses {
+            do {
+                let data = try JSONEncoder().encode(response)
+                var dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+                
+                // Convert timestamp to Firestore Timestamp
+                dict["timestamp"] = Timestamp(date: response.timestamp)
+                dict["userId"] = userId
+                dict["articleId"] = articleId
+                
+                // Save to the multiple_choice_responses subcollection within the question session
+                let docRef = db.collection("question_sessions")
+                    .document(questionSessionId)
+                    .collection("multiple_choice_responses")
+                    .document("question_\(response.questionNumber)")
+                
+                batch.setData(dict, forDocument: docRef)
+            } catch {
+                print("Error encoding response for question \(response.questionNumber): \(error.localizedDescription)")
+            }
+        }
+        
+        // Commit the batch
+        batch.commit { error in
+            if let error = error {
+                print("Error saving multiple choice responses: \(error.localizedDescription)")
+            } else {
+                print("Successfully saved \(multipleChoiceResponses.count) multiple choice responses")
             }
         }
     }
@@ -1066,7 +1176,7 @@ struct QuestionContentView: View {
     @Binding var recordingVocabularyWord: String?
     let speechManager: SpeechRecognitionManager
     let onWordTap: (String) -> Void
-    let onMultipleChoiceAnswer: (Bool) -> Void
+    let onMultipleChoiceAnswer: (Bool, Int, String, String, String) -> Void // isCorrect, questionNumber, questionText, studentChoice, correctChoice
     let onOpenEndedAnswer: (Bool) -> Void
     let onVocabularyAnswer: (Bool) -> Void
     let articleContent: String
@@ -1089,13 +1199,25 @@ struct QuestionContentView: View {
                             // Convert the answer reference (A, B, C, D) to the actual choice text
                             let correctAnswerText = getCorrectAnswerText(for: mcQuestion)
                             let isCorrect = answer == correctAnswerText
-                            onMultipleChoiceAnswer(isCorrect)
+                            
+                            // Convert the full answer text to choice letter format
+                            let choiceMapping = [
+                                mcQuestion.choices[0]: "choice_a",
+                                mcQuestion.choices[1]: "choice_b", 
+                                mcQuestion.choices[2]: "choice_c",
+                                mcQuestion.choices[3]: "choice_d"
+                            ]
+                            let studentChoice = choiceMapping[answer] ?? ""
+                            let correctChoice = mcQuestion.answer // Already in choice_a format
+                            
+                            // Call the new tracking function with choice letter format
+                            onMultipleChoiceAnswer(isCorrect, questionIndex + 1, mcQuestion.questionText, studentChoice, correctChoice)
                             
                             // Debug logging
                             print("Multiple Choice Question: \(mcQuestion.questionText)")
                             print("Selected Answer: \(answer)")
-                            print("Correct Answer Reference: \(mcQuestion.answer)")
-                            print("Correct Answer Text: \(correctAnswerText)")
+                            print("Student Choice: \(studentChoice)")
+                            print("Correct Choice: \(correctChoice)")
                             print("Is Correct: \(isCorrect)")
                         }
                     )

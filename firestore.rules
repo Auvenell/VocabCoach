@@ -62,6 +62,14 @@ service cloud.firestore {
         get(/databases/$(database)/documents/question_sessions/$(questionSessionId)).data.userId == request.auth.uid;
     }
     
+    // Multiple choice responses within question sessions
+    match /question_sessions/{questionSessionId}/multiple_choice_responses/{responseId} {
+      allow read, write: if isAuthenticated() && 
+        get(/databases/$(database)/documents/question_sessions/$(questionSessionId)).data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && 
+        get(/databases/$(database)/documents/question_sessions/$(questionSessionId)).data.userId == request.auth.uid;
+    }
+    
     // Direct open-ended responses within question sessions
     match /question_sessions/{questionSessionId}/open_ended_responses/{responseId} {
       allow read, write: if isAuthenticated() && 

@@ -163,53 +163,20 @@ class LLMEvaluationService: ObservableObject {
                let content = message["content"] as? String {
                 
                 // Extract JSON from markdown code blocks (```json ... ```)
-                if let jsonContent = extractJSONFromMarkdown(content) {
-                    return parseJSONResponse(jsonContent)
+                guard let jsonContent = extractJSONFromMarkdown(content) else {
+                    fatalError("Failed to extract JSON from markdown in LLM response")
                 }
-                
-                // Try to extract JSON from the content (fallback)
-                let jsonPattern = "\\{[^}]*\"isCorrect\"[^}]*\\}"
-                if let range = content.range(of: jsonPattern, options: .regularExpression) {
-                    let jsonString = String(content[range])
-                    return parseJSONResponse(jsonString)
-                }
-                
-                // If no JSON found, try to infer from the content
-                let lowerContent = content.lowercased()
-                let isCorrect = lowerContent.contains("correct") || lowerContent.contains("good") || lowerContent.contains("accurate")
-                let score = isCorrect ? 0.8 : 0.3
-                
-                return EvaluationResponse(
-                    score: score,
-                    feedback: "LLM evaluation completed",
-                    reasoning: content
-                )
+                return parseJSONResponse(jsonContent)
             }
         } catch {
             print("Failed to parse OpenAI-compatible response: \(error)")
         }
         
         // Fallback: try to extract JSON from the raw response
-        if let jsonContent = extractJSONFromMarkdown(response) {
-            return parseJSONResponse(jsonContent)
+        guard let jsonContent = extractJSONFromMarkdown(response) else {
+            fatalError("Failed to extract JSON from markdown in raw LLM response")
         }
-        
-        let jsonPattern = "\\{[^}]*\"isCorrect\"[^}]*\\}"
-        if let range = response.range(of: jsonPattern, options: .regularExpression) {
-            let jsonString = String(response[range])
-            return parseJSONResponse(jsonString)
-        }
-        
-        // If no JSON found, try to infer from the response
-        let lowerResponse = response.lowercased()
-        let isCorrect = lowerResponse.contains("correct") || lowerResponse.contains("good") || lowerResponse.contains("accurate")
-        let score = isCorrect ? 0.8 : 0.3
-        
-        return EvaluationResponse(
-            score: score,
-            feedback: "LLM evaluation completed",
-            reasoning: response
-        )
+        return parseJSONResponse(jsonContent)
     }
     
     private func extractJSONFromMarkdown(_ content: String) -> String? {
@@ -238,14 +205,20 @@ class LLMEvaluationService: ObservableObject {
         return jsonContent
     }
     
-    private func parseJSONResponse(_ jsonString: String) -> EvaluationResponse? {
+    private func parseJSONResponse(_ jsonString: String) -> EvaluationResponse {
         do {
             let data = jsonString.data(using: .utf8)!
             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
             
-            let score = json?["score"] as? Double ?? 0.0
-            let feedback = json?["feedback"] as? String ?? "No feedback provided"
-            let reasoning = json?["reasoning"] as? String ?? "No reasoning provided"
+            guard let score = json?["score"] as? Double else {
+                fatalError("Failed to parse score from JSON response")
+            }
+            guard let feedback = json?["feedback"] as? String else {
+                fatalError("Failed to parse feedback from JSON response")
+            }
+            guard let reasoning = json?["reasoning"] as? String else {
+                fatalError("Failed to parse reasoning from JSON response")
+            }
             
             return EvaluationResponse(
                 score: score,
@@ -253,8 +226,7 @@ class LLMEvaluationService: ObservableObject {
                 reasoning: reasoning
             )
         } catch {
-            print("JSON parsing error: \(error)")
-            return nil
+            fatalError("JSON parsing error: \(error)")
         }
     }
     
