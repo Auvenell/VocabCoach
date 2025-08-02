@@ -367,12 +367,46 @@ struct QuestionsView: View {
     
     // MARK: - Question Session Tracking
     
+    @State private var questionSessionId: String?
+    
     private func startQuestionSession() {
         sessionStartTime = Date()
         multipleChoiceCorrect = 0
         openEndedCorrect = 0
         vocabularyCorrect = 0
         sessionCompleted = false
+        
+        // Create the question session document at the start
+        createQuestionSessionDocument()
+    }
+    
+    private func createQuestionSessionDocument() {
+        guard let userId = Auth.auth().currentUser?.uid else { return }
+        
+        let sessionId = UUID().uuidString
+        questionSessionId = sessionId
+        
+        // Create initial session document with basic info
+        let initialSessionData: [String: Any] = [
+            "sessionId": sessionId,
+            "userId": userId,
+            "articleId": articleId,
+            "totalTimeSpent": 0,
+            "completed": false,
+            "totalPoints": 0,
+            "earnedPoints": 0,
+            "createdAt": Timestamp(date: Date()),
+            "accuracy": 0.0
+        ]
+        
+        let db = Firestore.firestore()
+        db.collection("question_sessions").document(sessionId).setData(initialSessionData) { error in
+            if let error = error {
+                print("Error creating question session: \(error.localizedDescription)")
+            } else {
+                print("Successfully created question session: \(sessionId)")
+            }
+        }
     }
     
     private func trackMultipleChoiceAnswer(isCorrect: Bool) {
@@ -395,7 +429,8 @@ struct QuestionsView: View {
     
     private func saveQuestionSessions() {
         guard let userId = Auth.auth().currentUser?.uid,
-              let startTime = sessionStartTime else { return }
+              let startTime = sessionStartTime,
+              let sessionId = questionSessionId else { return }
         
         let timeSpent = Date().timeIntervalSince(startTime)
         
@@ -421,8 +456,9 @@ struct QuestionsView: View {
                 timeSpent: timeSpent * Double(vocabularyWords.count) / Double(getTotalQuestions())
             ) : nil
         
-        // Save combined session with nested collections
-        progressManager.saveCombinedQuestionSession(
+        // Update the existing question session with final data
+        progressManager.updateQuestionSession(
+            sessionId: sessionId,
             userId: userId,
             articleId: articleId,
             multipleChoiceData: multipleChoiceData,
@@ -431,8 +467,8 @@ struct QuestionsView: View {
             completed: true
         )
         
-        // Save open-ended responses as a collection
-        saveOpenEndedResponsesCollection(userId: userId)
+        // Save open-ended responses as a nested collection within the question session
+        saveOpenEndedResponsesCollection(userId: userId, questionSessionId: sessionId)
         
         sessionCompleted = true
     }
@@ -480,7 +516,8 @@ struct QuestionsView: View {
     
     // Save individual open-ended question response to Firestore
     private func saveOpenEndedResponse(_ response: OpenEndedQuestionResponse) {
-        guard let userId = Auth.auth().currentUser?.uid else { return }
+        guard let userId = Auth.auth().currentUser?.uid,
+              let sessionId = questionSessionId else { return }
         
         let db = Firestore.firestore()
         
@@ -491,14 +528,25 @@ struct QuestionsView: View {
             // Convert timestamp to Firestore Timestamp
             dict["timestamp"] = Timestamp(date: response.timestamp)
             
+            // Add required fields for Firestore rules
+            dict["userId"] = userId
+            dict["articleId"] = articleId
+            dict["sessionId"] = sessionId
+            
             // Create a unique document ID for this response
             let documentId = "\(userId)_\(articleId)_\(response.questionNumber)"
             
-            db.collection("open_ended_responses").document(documentId).setData(dict) { error in
+            // Save ONLY to the nested structure within the question session
+            let nestedDocRef = db.collection("question_sessions")
+                .document(sessionId)
+                .collection("open_ended_responses")
+                .document("question_\(response.questionNumber)")
+            
+            nestedDocRef.setData(dict) { error in
                 if let error = error {
-                    print("Error saving open-ended response: \(error.localizedDescription)")
+                    print("Error saving nested open-ended response: \(error.localizedDescription)")
                 } else {
-                    print("Successfully saved open-ended response for question \(response.questionNumber)")
+                    print("Successfully saved nested open-ended response for question \(response.questionNumber)")
                 }
             }
         } catch {
@@ -506,12 +554,12 @@ struct QuestionsView: View {
         }
     }
     
-    // Save open-ended responses as a collection for the session
-    private func saveOpenEndedResponsesCollection(userId: String) {
+    // Save open-ended responses as a nested collection within the question session
+    private func saveOpenEndedResponsesCollection(userId: String, questionSessionId: String) {
         guard !openEndedResponses.isEmpty else { return }
         
         let db = Firestore.firestore()
-        let sessionId = UUID().uuidString
+        let openEndedSessionId = UUID().uuidString
         let timestamp = Date()
         
         // Create a batch write for all responses
@@ -524,13 +572,15 @@ struct QuestionsView: View {
                 
                 // Convert timestamp to Firestore Timestamp
                 dict["timestamp"] = Timestamp(date: response.timestamp)
-                dict["sessionId"] = sessionId
+                dict["sessionId"] = openEndedSessionId
                 dict["userId"] = userId
                 dict["articleId"] = articleId
                 
-                // Create document reference for this response
-                let docRef = db.collection("open_ended_sessions")
-                    .document(sessionId)
+                // Create document reference for this response within the nested structure
+                let docRef = db.collection("question_sessions")
+                    .document(questionSessionId)
+                    .collection("open_ended_sessions")
+                    .document(openEndedSessionId)
                     .collection("responses")
                     .document("question_\(response.questionNumber)")
                 
@@ -540,9 +590,9 @@ struct QuestionsView: View {
             }
         }
         
-        // Create session metadata document
+        // Create session metadata document within the nested structure
         let sessionMetadata: [String: Any] = [
-            "sessionId": sessionId,
+            "sessionId": openEndedSessionId,
             "userId": userId,
             "articleId": articleId,
             "totalQuestions": openEndedResponses.count,
@@ -551,7 +601,11 @@ struct QuestionsView: View {
             "createdAt": Timestamp(date: timestamp)
         ]
         
-        let sessionDocRef = db.collection("open_ended_sessions").document(sessionId)
+        let sessionDocRef = db.collection("question_sessions")
+            .document(questionSessionId)
+            .collection("open_ended_sessions")
+            .document(openEndedSessionId)
+        
         batch.setData(sessionMetadata, forDocument: sessionDocRef)
         
         // Commit the batch
