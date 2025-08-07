@@ -110,14 +110,14 @@ class LLMEvaluationService: ObservableObject {
         
         // Prepare the request body for local LLM (OpenAI-compatible format)
         let requestBody: [String: Any] = [
-            "model": "local-model", // Your local model name
+            "model": "google/gemma-3-12b", // Your local model name
             "messages": [
                 [
                     "role": "user",
                     "content": request.prompt
                 ]
             ],
-            "max_tokens": 500,
+            "max_tokens": 5000,
             "temperature": 0.1,
             "stop": ["\n\n", "Human:", "Assistant:"]
         ]
