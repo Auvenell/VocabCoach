@@ -58,23 +58,6 @@ class QuestionEvaluationService: ObservableObject {
         return false
     }
     
-    // Simple evaluation for open-ended answers (fallback)
-    func evaluateOpenEndedAnswer(_ userAnswer: String, _ expectedAnswer: String) -> Bool {
-        let cleanUserAnswer = userAnswer.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let cleanExpectedAnswer = expectedAnswer.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        
-        // Simple keyword matching - check if user answer contains key words from expected answer
-        let expectedWords = cleanExpectedAnswer.components(separatedBy: .whitespaces)
-            .filter { $0.count > 3 } // Only consider words longer than 3 characters
-        
-        let userWords = Set(cleanUserAnswer.components(separatedBy: .whitespaces))
-        
-        let matchingWords = expectedWords.filter { userWords.contains($0) }
-        
-        // Consider correct if at least 60% of important words match
-        let matchPercentage = Double(matchingWords.count) / Double(expectedWords.count)
-        return matchPercentage >= 0.6
-    }
     
     // Check if all questions are completed
     func allQuestionsCompleted(

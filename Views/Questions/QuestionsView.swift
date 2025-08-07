@@ -178,10 +178,7 @@ struct QuestionsView: View {
                                     articleContent: articleContent,
                                     evaluateWithLLM: { article, questionText, expectedAnswer, studentAnswer, questionNumber in
                                         await evaluateWithLLM(article, questionText, expectedAnswer, studentAnswer, questionNumber)
-                                    },
-                                    evaluateOpenEndedAnswer: { userAnswer, expectedAnswer in
-                                        evaluateOpenEndedAnswer(userAnswer, expectedAnswer)
-                                    },
+                                                        },
                                     multipleChoiceSectionCompleted: multipleChoiceSectionCompleted
                                 )
                             }
@@ -239,6 +236,7 @@ struct QuestionsView: View {
                     multipleChoiceTotal: viewModel.multipleChoiceQuestions.count,
                     openEndedCorrect: openEndedScores.filter { $0 > 0.6 }.count, // Count questions with score > 0.6
                     openEndedTotal: viewModel.openEndedQuestions.count,
+                    openEndedScores: openEndedScores,
                     vocabularyCorrect: vocabularyCorrect,
                     vocabularyTotal: vocabularyWords.count,
                     onDismiss: {
@@ -578,22 +576,7 @@ struct QuestionsView: View {
                vocabularyWords.count
     }
     
-    // Evaluate open-ended answer using LLM
-    private func evaluateOpenEndedAnswer(_ userAnswer: String, _ expectedAnswer: String) -> Bool {
-        // For now, return a simple evaluation
-        // In the future, this will call the LLM service
-        let userAnswerLower = userAnswer.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        let expectedAnswerLower = expectedAnswer.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // Simple keyword matching for now
-        let userWords = Set(userAnswerLower.components(separatedBy: .whitespaces))
-        let expectedWords = Set(expectedAnswerLower.components(separatedBy: .whitespaces))
-        
-        let commonWords = userWords.intersection(expectedWords)
-        let similarity = Double(commonWords.count) / Double(max(expectedWords.count, 1))
-        
-        return similarity >= 0.3 // 30% keyword overlap
-    }
+
     
     // Fetch article content for LLM evaluation
     private func fetchArticleContent() {
@@ -944,6 +927,7 @@ struct QuestionResultsView: View {
     let multipleChoiceTotal: Int
     let openEndedCorrect: Int
     let openEndedTotal: Int
+    let openEndedScores: [Double]
     let vocabularyCorrect: Int
     let vocabularyTotal: Int
     let onDismiss: () -> Void
@@ -1001,15 +985,17 @@ struct QuestionResultsView: View {
                         correct: multipleChoiceCorrect,
                         total: multipleChoiceTotal,
                         pointsPerQuestion: 8,
-                        color: .blue
+                        color: .blue,
+                        scores: nil
                     )
                     
                     ResultRow(
                         title: "Open-Ended",
-                        correct: openEndedCorrect,
+                        correct: openEndedScores.filter { $0 > 0.6 }.count,
                         total: openEndedTotal,
                         pointsPerQuestion: 10,
-                        color: .green
+                        color: .green,
+                        scores: openEndedScores
                     )
                     
                     ResultRow(
@@ -1017,7 +1003,8 @@ struct QuestionResultsView: View {
                         correct: vocabularyCorrect,
                         total: vocabularyTotal,
                         pointsPerQuestion: 2,
-                        color: .orange
+                        color: .orange,
+                        scores: nil
                     )
                 }
                 
@@ -1047,9 +1034,16 @@ struct ResultRow: View {
     let total: Int
     let pointsPerQuestion: Int
     let color: Color
+    let scores: [Double]? // Optional array of scores for open-ended questions
     
     private var pointsEarned: Int {
-        return correct * pointsPerQuestion
+        if let scores = scores {
+            // For open-ended questions, use the sum of scores
+            return Int(scores.reduce(0, +) * Double(pointsPerQuestion))
+        } else {
+            // For multiple choice and vocabulary, use simple multiplication
+            return correct * pointsPerQuestion
+        }
     }
     
     private var totalPoints: Int {
@@ -1219,7 +1213,7 @@ struct QuestionContentView: View {
     let onVocabularyAnswer: (Bool) -> Void
     let articleContent: String
     let evaluateWithLLM: (String, String, String, String, Int) async -> Bool
-    let evaluateOpenEndedAnswer: (String, String) -> Bool
+
     let multipleChoiceSectionCompleted: Bool
     
     var body: some View {
@@ -1293,37 +1287,24 @@ struct QuestionContentView: View {
                             let userAnswer = openEndedAnswers[oeQuestion.questionText] ?? ""
                             let expectedAnswer = oeQuestion.answer
                             
-                            // Use LLM evaluation if article content is available
-                            if !articleContent.isEmpty {
-                                Task {
-                                    let isCorrect = await evaluateWithLLM(
-                                        articleContent,
-                                        oeQuestion.questionText,
-                                        expectedAnswer,
-                                        userAnswer,
-                                        questionIndex + 1
-                                    )
-                                    
-                                    await MainActor.run {
-                                        onOpenEndedAnswer(isCorrect)
-                                        
-                                        // Debug logging
-                                        print("Open-Ended Question (LLM): \(oeQuestion.questionText)")
-                                        print("User Answer: \(userAnswer)")
-                                        print("Expected Answer: \(expectedAnswer)")
-                                        print("Is Correct: \(isCorrect)")
-                                    }
-                                }
-                            } else {
-                                // Fallback to simple evaluation
-                                let isCorrect = evaluateOpenEndedAnswer(userAnswer, expectedAnswer)
-                                onOpenEndedAnswer(isCorrect)
+                            Task {
+                                let isCorrect = await evaluateWithLLM(
+                                    articleContent.isEmpty ? "No article content available" : articleContent,
+                                    oeQuestion.questionText,
+                                    expectedAnswer,
+                                    userAnswer,
+                                    questionIndex + 1
+                                )
                                 
-                                // Debug logging
-                                print("Open-Ended Question (Simple): \(oeQuestion.questionText)")
-                                print("User Answer: \(userAnswer)")
-                                print("Expected Answer: \(expectedAnswer)")
-                                print("Is Correct: \(isCorrect)")
+                                await MainActor.run {
+                                    onOpenEndedAnswer(isCorrect)
+                                    
+                                    // Debug logging
+                                    print("Open-Ended Question (LLM): \(oeQuestion.questionText)")
+                                    print("User Answer: \(userAnswer)")
+                                    print("Expected Answer: \(expectedAnswer)")
+                                    print("Is Correct: \(isCorrect)")
+                                }
                             }
                         },
                         onUnlockAnswer: {
