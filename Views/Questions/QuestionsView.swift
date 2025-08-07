@@ -40,6 +40,10 @@ struct QuestionsView: View {
     @State private var showingSubmitButton: Bool = false
     @State private var showingResults: Bool = false
     
+    // Calculated points from database (to be used in quiz complete popup)
+    @State private var calculatedTotalPoints: Int = 0
+    @State private var calculatedEarnedPoints: Int = 0
+    
     // Open-ended question responses storage
     @State private var openEndedResponses: [OpenEndedQuestionResponse] = []
     
@@ -227,20 +231,33 @@ struct QuestionsView: View {
             ArticleView(articleId: articleId, practiceSession: practiceSession)
         }
         .sheet(isPresented: $showingResults) {
-            QuestionResultsView(
-                totalPointsEarned: totalPointsEarned,
-                totalPossiblePoints: totalPossiblePoints,
-                multipleChoiceCorrect: multipleChoiceCorrect,
-                multipleChoiceTotal: viewModel.multipleChoiceQuestions.count,
-                openEndedCorrect: openEndedScores.filter { $0 > 0.6 }.count, // Count questions with score > 0.6
-                openEndedTotal: viewModel.openEndedQuestions.count,
-                vocabularyCorrect: vocabularyCorrect,
-                vocabularyTotal: vocabularyWords.count,
-                onDismiss: {
-                    showingResults = false
-                    dismiss()
+            if let earnedPoints = totalPointsEarned, let possiblePoints = totalPossiblePoints {
+                QuestionResultsView(
+                    totalPointsEarned: earnedPoints,
+                    totalPossiblePoints: possiblePoints,
+                    multipleChoiceCorrect: multipleChoiceCorrect,
+                    multipleChoiceTotal: viewModel.multipleChoiceQuestions.count,
+                    openEndedCorrect: openEndedScores.filter { $0 > 0.6 }.count, // Count questions with score > 0.6
+                    openEndedTotal: viewModel.openEndedQuestions.count,
+                    vocabularyCorrect: vocabularyCorrect,
+                    vocabularyTotal: vocabularyWords.count,
+                    onDismiss: {
+                        showingResults = false
+                        dismiss()
+                    }
+                )
+            } else {
+                VStack(spacing: 20) {
+                    ProgressView("Loading results...")
+                        .font(.headline)
+                    Text("Please wait while we calculate your score.")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
                 }
-            )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemBackground))
+            }
         }
         .sheet(isPresented: $showingMultipleChoiceConfirmation) {
             MultipleChoiceConfirmationView(
@@ -519,7 +536,7 @@ struct QuestionsView: View {
             ) : nil
         
         // Update the existing question session with final data
-        progressManager.updateQuestionSession(
+        let (totalPoints, earnedPoints) = progressManager.updateQuestionSession(
             sessionId: sessionId,
             userId: userId,
             articleId: articleId,
@@ -528,6 +545,10 @@ struct QuestionsView: View {
             vocabularyData: vocabularyData,
             completed: true
         )
+        
+        // Store the calculated points for use in the quiz complete popup
+        calculatedTotalPoints = totalPoints
+        calculatedEarnedPoints = earnedPoints
         
         // Save open-ended responses as a nested collection within the question session
         saveOpenEndedResponsesCollection(userId: userId, questionSessionId: sessionId)
@@ -603,8 +624,8 @@ struct QuestionsView: View {
             dict["articleId"] = articleId
             dict["sessionId"] = sessionId
             
-            // Create a unique document ID for this response
-            let documentId = "\(userId)_\(articleId)_\(response.questionNumber)"
+            // Create a unique document ID for this response (unused, but kept for reference)
+            _ = "\(userId)_\(articleId)_\(response.questionNumber)"
             
             // Save ONLY to the nested structure within the question session
             let nestedDocRef = db.collection("question_sessions")
@@ -809,19 +830,23 @@ struct QuestionsView: View {
     }
     
     // Calculate total points earned
-    private var totalPointsEarned: Int {
-        let multipleChoicePoints = multipleChoiceCorrect * 8
-        let openEndedPoints = Int(openEndedScores.reduce(0, +) * 10) // Sum of scores * 10 points per question
-        let vocabularyPoints = vocabularyCorrect * 2
-        return multipleChoicePoints + openEndedPoints + vocabularyPoints
+    private var totalPointsEarned: Int? {
+        // Use calculated points from database if available (after session completion)
+        if sessionCompleted && calculatedEarnedPoints > 0 {
+            return calculatedEarnedPoints
+        }
+        // Return nil if data is not available yet
+        return nil
     }
     
     // Calculate total possible points
-    private var totalPossiblePoints: Int {
-        let multipleChoiceTotal = viewModel.multipleChoiceQuestions.count * 8
-        let openEndedTotal = viewModel.openEndedQuestions.count * 10
-        let vocabularyTotal = vocabularyWords.count * 2
-        return multipleChoiceTotal + openEndedTotal + vocabularyTotal
+    private var totalPossiblePoints: Int? {
+        // Use calculated points from database if available (after session completion)
+        if sessionCompleted && calculatedTotalPoints > 0 {
+            return calculatedTotalPoints
+        }
+        // Return nil if data is not available yet
+        return nil
     }
     
     // Update header title based on current section

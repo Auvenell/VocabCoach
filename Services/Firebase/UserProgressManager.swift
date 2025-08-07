@@ -508,7 +508,7 @@ class UserProgressManager: ObservableObject {
         openEndedData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval, scores: [Double])?,
         vocabularyData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)?,
         completed: Bool = true
-    ) {
+    ) -> (totalPoints: Int, earnedPoints: Int) {
         let createdAt = Date()
         
         // Calculate individual session data
@@ -619,6 +619,7 @@ class UserProgressManager: ObservableObject {
         )
         
         updateCombinedQuestionSession(combinedSession)
+        return (totalPoints: totalPoints, earnedPoints: earnedPoints)
     }
     
     private func saveCombinedQuestionSession(_ session: CombinedQuestionSession) {
