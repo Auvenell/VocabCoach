@@ -215,9 +215,27 @@ class UserProgressManager: ObservableObject {
                 }
                 
                 if let data = snapshot?.data() {
+                    // Convert Firestore data to JSON-serializable format
+                    var serializableData: [String: Any] = [:]
+                    
+                    for (key, value) in data {
+                        if let timestamp = value as? Timestamp {
+                            // Convert FIRTimestamp to ISO8601 string
+                            let date = timestamp.dateValue()
+                            let formatter = ISO8601DateFormatter()
+                            serializableData[key] = formatter.string(from: date)
+                        } else {
+                            serializableData[key] = value
+                        }
+                    }
+                    
                     do {
-                        let jsonData = try JSONSerialization.data(withJSONObject: data)
-                        self?.currentProgress = try JSONDecoder().decode(UserProgress.self, from: jsonData)
+                        let jsonData = try JSONSerialization.data(withJSONObject: serializableData)
+                        
+                        let decoder = JSONDecoder()
+                        decoder.dateDecodingStrategy = .iso8601
+                        
+                        self?.currentProgress = try decoder.decode(UserProgress.self, from: jsonData)
                     } catch {
                         self?.errorMessage = "Failed to decode user progress: \(error.localizedDescription)"
                     }
