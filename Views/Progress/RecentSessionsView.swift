@@ -54,9 +54,10 @@ struct RecentSessionCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Session \(session.sessionId.prefix(8))")
+                    Text(session.articleTitle)
                         .font(.subheadline)
                         .fontWeight(.medium)
+                        .lineLimit(2)
                     
                     Text(formatDate(session.createdAt))
                         .font(.caption)

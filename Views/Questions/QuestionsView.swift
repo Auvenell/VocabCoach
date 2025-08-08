@@ -15,6 +15,7 @@ struct QuestionsView: View {
     @StateObject private var progressManager = UserProgressManager()
     @StateObject private var llmService = LLMEvaluationService()
     @State private var articleContent: String = ""
+    @State private var articleTitle: String = ""
     @EnvironmentObject var headerState: HeaderState
     @Environment(\.dismiss) private var dismiss
     @State private var isLoading = true
@@ -541,6 +542,7 @@ struct QuestionsView: View {
             sessionId: questionSessionId ?? "",
             userId: userId,
             articleId: articleId,
+            articleTitle: articleTitle,
             multipleChoiceData: multipleChoiceData,
             openEndedData: openEndedData,
             vocabularyData: vocabularyData,
@@ -587,6 +589,7 @@ struct QuestionsView: View {
         db.collection("articles").document(articleId).getDocument { snapshot, error in
             if let data = snapshot?.data() {
                 self.articleContent = data["content"] as? String ?? ""
+                self.articleTitle = data["title"] as? String ?? ""
             }
         }
     }

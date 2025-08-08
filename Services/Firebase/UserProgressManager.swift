@@ -89,6 +89,7 @@ struct CombinedQuestionSession: Codable {
     let sessionId: String
     let userId: String
     let articleId: String
+    let articleTitle: String
     let totalTimeSpent: TimeInterval
     let completed: Bool
     let totalPoints: Int
@@ -403,6 +404,7 @@ class UserProgressManager: ObservableObject {
     func saveCombinedQuestionSession(
         userId: String,
         articleId: String,
+        articleTitle: String,
         multipleChoiceData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)?,
         openEndedData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval, scores: [Double])?,
         vocabularyData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)?,
@@ -508,6 +510,7 @@ class UserProgressManager: ObservableObject {
             sessionId: sessionId,
             userId: userId,
             articleId: articleId,
+            articleTitle: articleTitle,
             totalTimeSpent: totalTimeSpent,
             completed: completed,
             totalPoints: totalPoints,
@@ -528,6 +531,7 @@ class UserProgressManager: ObservableObject {
         sessionId: String,
         userId: String,
         articleId: String,
+        articleTitle: String,
         multipleChoiceData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)?,
         openEndedData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval, scores: [Double])?,
         vocabularyData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)?,
@@ -631,6 +635,7 @@ class UserProgressManager: ObservableObject {
             sessionId: sessionId,
             userId: userId,
             articleId: articleId,
+            articleTitle: articleTitle,
             totalTimeSpent: totalTimeSpent,
             completed: completed,
             totalPoints: totalPoints,
@@ -996,5 +1001,17 @@ class UserProgressManager: ObservableObject {
         }
         
         return Array(dailyStats.values).sorted { $0.date < $1.date }
+    }
+    
+    // Helper method to get article title
+    func getArticleTitle(articleId: String, completion: @escaping (String) -> Void) {
+        db.collection("articles").document(articleId).getDocument { snapshot, error in
+            if let data = snapshot?.data(),
+               let title = data["title"] as? String {
+                completion(title)
+            } else {
+                completion("Unknown Article")
+            }
+        }
     }
 } 
