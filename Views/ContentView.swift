@@ -93,7 +93,7 @@ struct ContentView: View {
                     })
                     .environmentObject(headerState)
                 } else {
-                    PracticeView(showingParagraphSelector: $showingParagraphSelector)
+                    ReadingPracticeView(showingParagraphSelector: $showingParagraphSelector)
                         .environmentObject(headerState)
                 }
 

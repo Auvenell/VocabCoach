@@ -22,7 +22,7 @@ VocabCoach is an iOS mobile app designed to help users improve their spoken Engl
 - **SwiftUI**
 - **SpeechRecognitionManager**: Handles live speech transcription
 - **TextToSpeechManager**: Provides pronunciation feedback
-- **PracticeView**: Main interface for reading practice
+- **ReadingPracticeView**: Main interface for reading practice
 - **TappableTextView**: Interactive text display with highlighting
 
 ### Permissions Required
