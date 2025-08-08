@@ -366,7 +366,8 @@ class UserProgressManager: ObservableObject {
         totalQuestions: Int,
         correctAnswers: Int,
         timeSpent: TimeInterval,
-        completed: Bool = true
+        completed: Bool = true,
+        sessionId: String? = nil
     ) {
         let (totalPoints, earnedPoints) = calculateQuestionSessionPoints(
             questionType: questionType,
@@ -377,7 +378,7 @@ class UserProgressManager: ObservableObject {
         let accuracy = totalQuestions > 0 ? Double(correctAnswers) / Double(totalQuestions) : 0.0
         
         let session = QuestionSession(
-            sessionId: UUID().uuidString,
+            sessionId: sessionId ?? UUID().uuidString,
             userId: userId,
             articleId: articleId,
             questionType: questionType,
@@ -401,9 +402,10 @@ class UserProgressManager: ObservableObject {
         multipleChoiceData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)?,
         openEndedData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval, scores: [Double])?,
         vocabularyData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval)?,
-        completed: Bool = true
+        completed: Bool = true,
+        sessionId: String? = nil
     ) -> String {
-        let sessionId = UUID().uuidString
+        let sessionId = sessionId ?? UUID().uuidString
         let createdAt = Date()
         
         // Calculate individual session data

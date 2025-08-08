@@ -22,7 +22,7 @@ class QuestionSessionManager: ObservableObject {
     @Published var openEndedResponses: [OpenEndedQuestionResponse] = []
     @Published var multipleChoiceSectionCompleted: Bool = false
     
-    func startQuestionSession() {
+    func startQuestionSession(sessionId: String? = nil) {
         sessionStartTime = Date()
         multipleChoiceCorrect = 0
         openEndedScores.removeAll()
@@ -31,13 +31,14 @@ class QuestionSessionManager: ObservableObject {
         sessionCompleted = false
         
         // Create the question session document at the start
-        createQuestionSessionDocument()
+        createQuestionSessionDocument(sessionId: sessionId)
     }
     
-    private func createQuestionSessionDocument() {
+    private func createQuestionSessionDocument(sessionId: String? = nil) {
         guard let userId = Auth.auth().currentUser?.uid else { return }
         
-        let sessionId = UUID().uuidString
+        // Use the passed sessionId if available, otherwise generate a new one
+        let sessionId = sessionId ?? UUID().uuidString
         questionSessionId = sessionId
         
         // Create initial session document with basic info

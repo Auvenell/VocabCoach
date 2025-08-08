@@ -72,6 +72,7 @@ enum WordClassifier {
 
 struct ReadingSession {
     let paragraph: PracticeParagraph
+    let sessionId: String // Add sessionId property
     var wordAnalyses: [WordAnalysis] = []
     var startTime: Date?
     var endTime: Date?
@@ -89,6 +90,7 @@ struct ReadingSession {
 
     init(paragraph: PracticeParagraph) {
         self.paragraph = paragraph
+        self.sessionId = UUID().uuidString // Generate sessionId
         totalWords = paragraph.words.count
         initializeWordAnalyses()
     }

@@ -61,7 +61,8 @@ struct ReadingPracticeView: View {
             .navigationDestination(isPresented: $showQuestions) {
                 QuestionsView(
                     articleId: selectedParagraph?.id ?? "",
-                    practiceSession: currentSession
+                    practiceSession: currentSession,
+                    sessionId: currentSession?.sessionId
                 )
                 .environmentObject(headerState)
             }
@@ -162,7 +163,7 @@ struct ReadingPracticeView: View {
         let timeSpent = session.endTime?.timeIntervalSince(session.startTime ?? Date()) ?? 0
         
         let readingSession = UserReadingSession(
-            sessionId: UUID().uuidString,
+            sessionId: session.sessionId, // Use the sessionId from ReadingSession
             userId: userId,
             articleId: session.paragraph.id,
             articleTitle: session.paragraph.title,

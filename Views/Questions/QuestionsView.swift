@@ -9,6 +9,7 @@ import Combine
 struct QuestionsView: View {
     let articleId: String
     let practiceSession: ReadingSession? // Optional practice session data
+    let sessionId: String? // SessionId from reading session
     @StateObject private var viewModel = ArticleViewModel()
     @StateObject private var speechManager = SpeechRecognitionManager()
     @StateObject private var progressManager = UserProgressManager()
@@ -431,7 +432,8 @@ struct QuestionsView: View {
     private func createQuestionSessionDocument() {
         guard let userId = Auth.auth().currentUser?.uid else { return }
         
-        let sessionId = UUID().uuidString
+        // Use the passed sessionId if available, otherwise generate a new one
+        let sessionId = self.sessionId ?? UUID().uuidString
         questionSessionId = sessionId
         
         // Create initial session document with basic info
@@ -536,7 +538,7 @@ struct QuestionsView: View {
         
         // Update the existing question session with final data
         let (totalPoints, earnedPoints) = progressManager.updateQuestionSession(
-            sessionId: sessionId,
+            sessionId: questionSessionId ?? "",
             userId: userId,
             articleId: articleId,
             multipleChoiceData: multipleChoiceData,
@@ -550,10 +552,10 @@ struct QuestionsView: View {
         calculatedEarnedPoints = earnedPoints
         
         // Save open-ended responses as a nested collection within the question session
-        saveOpenEndedResponsesCollection(userId: userId, questionSessionId: sessionId)
+        saveOpenEndedResponsesCollection(userId: userId, questionSessionId: questionSessionId ?? "")
         
         // Save multiple choice responses as a nested collection within the question session
-        saveMultipleChoiceResponsesCollection(userId: userId, questionSessionId: sessionId)
+        saveMultipleChoiceResponsesCollection(userId: userId, questionSessionId: questionSessionId ?? "")
         
         sessionCompleted = true
     }
