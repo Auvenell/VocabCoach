@@ -14,6 +14,7 @@ struct ReadingPracticeView: View {
     @State private var feedbackMessage = ""
     @State private var scrollTargetIndex: Int? = nil
     @State private var showQuestions = false
+    @State private var sessionSaved = false
 
 
     var body: some View {
@@ -106,6 +107,7 @@ struct ReadingPracticeView: View {
 
     private func startNewSession(with paragraph: PracticeParagraph) {
         currentSession = ReadingSession(paragraph: paragraph)
+        sessionSaved = false
         speechManager.reset()
         ttsManager.stopSpeaking()
         scrollTargetIndex = 0
@@ -160,6 +162,10 @@ struct ReadingPracticeView: View {
     private func saveSessionToProgress(_ session: ReadingSession) {
         guard let userId = Auth.auth().currentUser?.uid else { return }
         
+        // Prevent double-saving
+        guard !sessionSaved else { return }
+        sessionSaved = true
+        
         let timeSpent = session.endTime?.timeIntervalSince(session.startTime ?? Date()) ?? 0
         
         let readingSession = UserReadingSession(
@@ -184,14 +190,14 @@ struct ReadingPracticeView: View {
         progressManager.saveReadingSession(readingSession)
         
         // Update word progress for each word
-        for (index, wordAnalysis) in session.wordAnalyses.enumerated() {
+        /* for (index, wordAnalysis) in session.wordAnalyses.enumerated() {
             let word = session.paragraph.words[index]
             progressManager.updateWordProgress(
                 userId: userId,
                 word: word,
                 isCorrect: wordAnalysis.isCorrect
             )
-        }
+        } */
     }
 
     private func updateSession(with transcription: String) {
@@ -228,6 +234,10 @@ struct ReadingPracticeView: View {
             // All words completed - stop listening automatically
             speechManager.stopListening()
 
+            // Set end time before saving
+            session.endTime = Date()
+            currentSession = session
+            
             // Save the completed session to progress tracking
             saveSessionToProgress(session)
 

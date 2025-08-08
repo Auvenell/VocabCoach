@@ -319,8 +319,12 @@ class UserProgressManager: ObservableObject {
             let data = try JSONEncoder().encode(session)
             var dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
             
-            // Convert createdAt to Firestore Timestamp
+            // Convert date fields to Firestore Timestamps
             dict["createdAt"] = Timestamp(date: session.createdAt)
+            dict["startTime"] = Timestamp(date: session.startTime)
+            if let endTime = session.endTime {
+                dict["endTime"] = Timestamp(date: endTime)
+            }
             
             db.collection("reading_sessions").document(session.sessionId).setData(dict) { [weak self] error in
                 DispatchQueue.main.async {
