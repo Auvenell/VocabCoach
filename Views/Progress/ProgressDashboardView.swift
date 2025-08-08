@@ -5,6 +5,8 @@ import FirebaseAuth
 struct ProgressDashboardView: View {
     // MARK: - Properties
     @StateObject private var progressManager = UserProgressManager()
+    @State private var recentSessions: [CombinedQuestionSession] = []
+    @State private var isLoadingSessions = false
     @EnvironmentObject var headerState: HeaderState
     var onBack: (() -> Void)?
     
@@ -13,11 +15,11 @@ struct ProgressDashboardView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                    // TODO: Add your progress dashboard content here
-                    Text("Progress Dashboard - Empty Template")
-                        .font(.title)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    // Recent Sessions Section
+                    RecentSessionsView(
+                        sessions: recentSessions,
+                        isLoading: isLoadingSessions
+                    )
                 }
                 .padding()
             }
@@ -25,6 +27,7 @@ struct ProgressDashboardView: View {
             .navigationBarTitleDisplayMode(.large)
             .onAppear {
                 setupHeader()
+                loadRecentSessions()
             }
         }
     }
@@ -36,6 +39,18 @@ struct ProgressDashboardView: View {
         headerState.title = "Progress"
         headerState.titleIcon = "chart.bar.fill"
         headerState.titleColor = .blue
+    }
+    
+    private func loadRecentSessions() {
+        guard let userId = Auth.auth().currentUser?.uid else { return }
+        
+        isLoadingSessions = true
+        progressManager.getRecentQuestionSessions(userId: userId, limit: 3) { sessions in
+            DispatchQueue.main.async {
+                self.recentSessions = sessions
+                self.isLoadingSessions = false
+            }
+        }
     }
 }
 

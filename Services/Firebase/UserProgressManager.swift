@@ -910,6 +910,58 @@ class UserProgressManager: ObservableObject {
             }
     }
     
+    func getRecentQuestionSessions(userId: String, limit: Int = 3, completion: @escaping ([CombinedQuestionSession]) -> Void) {
+        db.collection("question_sessions")
+            .whereField("userId", isEqualTo: userId)
+            .order(by: "createdAt", descending: true)
+            .limit(to: limit)
+            .getDocuments { snapshot, error in
+                guard let documents = snapshot?.documents else {
+                    completion([])
+                    return
+                }
+                
+                let sessions = documents.compactMap { doc -> CombinedQuestionSession? in
+                    do {
+                        let serializableData = self.convertFirestoreData(doc.data())
+                        let jsonData = try JSONSerialization.data(withJSONObject: serializableData)
+                        
+                        let decoder = JSONDecoder()
+                        decoder.dateDecodingStrategy = .iso8601
+                        
+                        return try decoder.decode(CombinedQuestionSession.self, from: jsonData)
+                    } catch {
+                        print("Error decoding session \(doc.documentID): \(error)")
+                        return nil
+                    }
+                }
+                
+                completion(sessions)
+            }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func convertFirestoreData(_ data: [String: Any]) -> [String: Any] {
+        var serializableData: [String: Any] = [:]
+        
+        for (key, value) in data {
+            if let timestamp = value as? Timestamp {
+                // Convert FIRTimestamp to ISO8601 string
+                let date = timestamp.dateValue()
+                let formatter = ISO8601DateFormatter()
+                serializableData[key] = formatter.string(from: date)
+            } else if let dict = value as? [String: Any] {
+                // Handle nested dictionaries (like session objects)
+                serializableData[key] = convertFirestoreData(dict)
+            } else {
+                serializableData[key] = value
+            }
+        }
+        
+        return serializableData
+    }
+    
     private func aggregateDailyStats(from documents: [QueryDocumentSnapshot]) -> [UserAnalytics.DailyStats] {
         let calendar = Calendar.current
         var dailyStats: [Date: UserAnalytics.DailyStats] = [:]
