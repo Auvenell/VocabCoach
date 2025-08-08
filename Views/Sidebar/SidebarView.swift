@@ -11,6 +11,7 @@ struct SidebarView: View {
     @Binding var isShowing: Bool
     @EnvironmentObject var userSession: UserSession
     var onSelectText: (() -> Void)?
+    var onSelectProgress: (() -> Void)?
 
     var body: some View {
         ZStack {
@@ -82,7 +83,7 @@ struct SidebarView: View {
                             title: "Progress",
                             isActive: false
                         ) {
-                            // Navigate to progress
+                            onSelectProgress?()
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 isShowing = false
                             }
@@ -177,8 +178,8 @@ struct SidebarMenuItem: View {
 }
 
 #Preview {
-    SidebarView(isShowing: .constant(true)) {
+    SidebarView(isShowing: .constant(true), onSelectProgress: {
         // Select text action
-    }
+    })
     .environmentObject(UserSession())
 }

@@ -295,8 +295,8 @@ struct EnhancedSidebarView: View {
 }
 
 #Preview {
-    SidebarView(isShowing: .constant(true)) {
+    SidebarView(isShowing: .constant(true), onSelectProgress: {
         // Select text action
-    }
+    })
     .environmentObject(UserSession())
 }
