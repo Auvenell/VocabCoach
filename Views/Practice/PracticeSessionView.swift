@@ -223,19 +223,3 @@ struct PracticeSessionView: View {
         }
     }
 }
-
-#Preview {
-    PracticeSessionView(
-        session: ReadingSession(paragraph: PracticeParagraph.sample),
-        transcribedText: "Hello world",
-        scrollTargetIndex: nil,
-        isListening: false,
-        onWordTap: { _ in },
-        onStartStopPractice: { },
-        onResetSession: { },
-        onResetToSentenceStart: { },
-        onSkipCurrentWord: { },
-        onSkipToEnd: { },
-        onContinueToQuestions: { }
-    )
-}
