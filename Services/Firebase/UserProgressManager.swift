@@ -332,7 +332,7 @@ class UserProgressManager: ObservableObject {
                     if let error = error {
                         self?.errorMessage = error.localizedDescription
                     } else {
-                        self?.updateUserProgressAfterSession(session)
+                        self?.updateUserProgressAfterReadingSession(session)
                     }
                 }
             }
@@ -363,42 +363,6 @@ class UserProgressManager: ObservableObject {
         }
     }
     
-    // Convenience function to create and save question sessions with points
-    func saveQuestionSessionWithPoints(
-        userId: String,
-        articleId: String,
-        questionType: QuestionSession.QuestionType,
-        totalQuestions: Int,
-        correctAnswers: Int,
-        timeSpent: TimeInterval,
-        completed: Bool = true,
-        sessionId: String? = nil
-    ) {
-        let (totalPoints, earnedPoints) = calculateQuestionSessionPoints(
-            questionType: questionType,
-            totalQuestions: totalQuestions,
-            correctAnswers: correctAnswers
-        )
-        
-        let accuracy = totalQuestions > 0 ? Double(correctAnswers) / Double(totalQuestions) : 0.0
-        
-        let session = QuestionSession(
-            sessionId: sessionId ?? UUID().uuidString,
-            userId: userId,
-            articleId: articleId,
-            questionType: questionType,
-            totalQuestions: totalQuestions,
-            correctAnswers: correctAnswers,
-            accuracy: accuracy,
-            timeSpent: timeSpent,
-            completed: completed,
-            totalPoints: totalPoints,
-            earnedPoints: earnedPoints,
-            createdAt: Date()
-        )
-        
-        saveQuestionSession(session)
-    }
     
     // New method to save combined question session with nested collections
     func saveCombinedQuestionSession(
@@ -522,7 +486,7 @@ class UserProgressManager: ObservableObject {
             vocabularySession: vocabularySession
         )
         
-        saveCombinedQuestionSession(combinedSession)
+        saveCombinedQuestionSessionToFirestore(combinedSession)
         return sessionId
     }
     
@@ -651,7 +615,7 @@ class UserProgressManager: ObservableObject {
         return (totalPoints: totalPoints, earnedPoints: earnedPoints)
     }
     
-    private func saveCombinedQuestionSession(_ session: CombinedQuestionSession) {
+    private func saveCombinedQuestionSessionToFirestore(_ session: CombinedQuestionSession) {
         do {
             let data = try JSONEncoder().encode(session)
             var dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
@@ -787,7 +751,7 @@ class UserProgressManager: ObservableObject {
     
     // MARK: - Progress Updates
     
-    private func updateUserProgressAfterSession(_ session: UserReadingSession) {
+    private func updateUserProgressAfterReadingSession(_ session: UserReadingSession) {
         guard var progress = currentProgress else { return }
         
         progress.totalSessions += 1
@@ -893,27 +857,6 @@ class UserProgressManager: ObservableObject {
             }
     }
     
-    func getWordMasteryProgress(userId: String, completion: @escaping ([WordProgress]) -> Void) {
-        db.collection("word_progress")
-            .whereField("userId", isEqualTo: userId)
-            .getDocuments { snapshot, error in
-                guard let documents = snapshot?.documents else {
-                    completion([])
-                    return
-                }
-                
-                let wordProgress = documents.compactMap { doc -> WordProgress? in
-                    do {
-                        let data = try JSONSerialization.data(withJSONObject: doc.data())
-                        return try JSONDecoder().decode(WordProgress.self, from: data)
-                    } catch {
-                        return nil
-                    }
-                }
-                
-                completion(wordProgress)
-            }
-    }
     
     func getRecentQuestionSessions(userId: String, limit: Int = 3, completion: @escaping ([CombinedQuestionSession]) -> Void) {
         db.collection("question_sessions")
