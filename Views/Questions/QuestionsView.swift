@@ -62,6 +62,7 @@ struct QuestionsView: View {
     // Navigation state
     @State private var currentSectionIndex = 0
     @State private var currentQuestionIndex = 0
+    @State private var navigateToSessionResults = false
     
     // Computed properties for navigation
     private var sections: [QuestionSection] {
@@ -242,9 +243,10 @@ struct QuestionsView: View {
                     openEndedScores: openEndedScores,
                     vocabularyCorrect: vocabularyCorrect,
                     vocabularyTotal: vocabularyWords.count,
+                    sessionId: questionSessionId ?? "",
                     onDismiss: {
                         showingResults = false
-                        dismiss()
+                        navigateToSessionResults = true
                     }
                 )
             } else {
@@ -260,6 +262,14 @@ struct QuestionsView: View {
                 .background(Color(.systemBackground))
             }
         }
+        .background(
+            NavigationLink(
+                destination: SessionResultsView(sessionId: questionSessionId ?? ""),
+                isActive: $navigateToSessionResults
+            ) {
+                EmptyView()
+            }
+        )
         .sheet(isPresented: $showingMultipleChoiceConfirmation) {
             MultipleChoiceConfirmationView(
                 onConfirm: {

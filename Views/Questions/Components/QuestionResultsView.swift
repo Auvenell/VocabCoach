@@ -10,6 +10,7 @@ struct QuestionResultsView: View {
     let openEndedScores: [Double]
     let vocabularyCorrect: Int
     let vocabularyTotal: Int
+    let sessionId: String
     let onDismiss: () -> Void
     
     private var accuracy: Double {
@@ -90,7 +91,7 @@ struct QuestionResultsView: View {
                 
                 Spacer()
                 
-                // Dismiss Button
+                // Continue Button
                 Button(action: onDismiss) {
                     Text("Continue")
                         .font(.headline)
