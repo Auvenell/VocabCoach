@@ -45,7 +45,7 @@ struct ProgressDashboardView: View {
         guard let userId = Auth.auth().currentUser?.uid else { return }
         
         isLoadingSessions = true
-        progressManager.getRecentQuestionSessions(userId: userId, limit: 3) { sessions in
+        progressManager.getRecentQuestionSessions(userId: userId, limit: 5) { sessions in
             DispatchQueue.main.async {
                 self.recentSessions = sessions
                 self.isLoadingSessions = false
