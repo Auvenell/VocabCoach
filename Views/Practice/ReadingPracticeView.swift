@@ -67,7 +67,7 @@ struct ReadingPracticeView: View {
                 )
                 .environmentObject(headerState)
             }
-            .sheet(isPresented: $showingParagraphSelector) {
+            .navigationDestination(isPresented: $showingParagraphSelector) {
                 ParagraphSelectorView(
                     dataManager: dataManager,
                     selectedParagraph: $selectedParagraph,
