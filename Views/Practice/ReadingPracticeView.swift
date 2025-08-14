@@ -5,6 +5,7 @@ struct ReadingPracticeView: View {
     @StateObject private var speechManager = SpeechRecognitionManager()
     @StateObject private var ttsManager = TextToSpeechManager()
     @StateObject private var dataManager = ParagraphDataManager()
+    @StateObject private var progressManager = UserProgressManager()
     @EnvironmentObject var headerState: HeaderState
 
     @State private var currentSession: ReadingSession?
@@ -98,6 +99,11 @@ struct ReadingPracticeView: View {
             headerState.title = "Reading"
             headerState.titleIcon = "book.fill"
             headerState.titleColor = .blue
+            
+            // Load user progress when view appears
+            if let userId = Auth.auth().currentUser?.uid {
+                progressManager.loadUserProgress(userId: userId)
+            }
         }
     }
 
@@ -166,7 +172,21 @@ struct ReadingPracticeView: View {
         guard !sessionSaved else { return }
         sessionSaved = true
         
+        // Ensure progress is loaded before saving session
+        if progressManager.currentProgress == nil {
+            progressManager.loadUserProgress(userId: userId)
+            // Wait a bit for the async load to complete, then save
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.saveSessionToProgress(session)
+            }
+            return
+        }
+        
         let timeSpent = session.endTime?.timeIntervalSince(session.startTime ?? Date()) ?? 0
+        
+        // Debug logging
+        print("Saving session - Total words: \(session.totalWords), Correct words: \(session.correctWords)")
+        print("Current progress - Total words read: \(progressManager.currentProgress?.totalWordsRead ?? 0), Total words correct: \(progressManager.currentProgress?.totalWordsCorrect ?? 0)")
         
         let readingSession = UserReadingSession(
             sessionId: session.sessionId, // Use the sessionId from ReadingSession
@@ -186,7 +206,7 @@ struct ReadingPracticeView: View {
             createdAt: Date()
         )
         
-        let progressManager = UserProgressManager()
+        // Use the injected progressManager instance instead of creating a new one
         progressManager.saveReadingSession(readingSession)
         
         // Update word progress for each word

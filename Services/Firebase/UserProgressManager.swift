@@ -204,6 +204,7 @@ class UserProgressManager: ObservableObject {
     // MARK: - User Progress Management
     
     func loadUserProgress(userId: String) {
+        print("loadUserProgress called for user: \(userId)")
         isLoading = true
         
         db.collection("user_progress").document(userId).getDocument { [weak self] snapshot, error in
@@ -211,11 +212,15 @@ class UserProgressManager: ObservableObject {
                 self?.isLoading = false
                 
                 if let error = error {
+                    print("ERROR loading progress: \(error.localizedDescription)")
                     self?.errorMessage = error.localizedDescription
                     return
                 }
                 
                 if let data = snapshot?.data() {
+                    print("Found existing progress data in Firestore")
+                    print("Raw data: \(data)")
+                    
                     // Convert Firestore data to JSON-serializable format
                     var serializableData: [String: Any] = [:]
                     
@@ -230,17 +235,24 @@ class UserProgressManager: ObservableObject {
                         }
                     }
                     
+                    print("Serializable data: \(serializableData)")
+                    
                     do {
                         let jsonData = try JSONSerialization.data(withJSONObject: serializableData)
                         
                         let decoder = JSONDecoder()
                         decoder.dateDecodingStrategy = .iso8601
                         
-                        self?.currentProgress = try decoder.decode(UserProgress.self, from: jsonData)
+                        let loadedProgress = try decoder.decode(UserProgress.self, from: jsonData)
+                        print("SUCCESS: Loaded progress - Total words read: \(loadedProgress.totalWordsRead), Total words correct: \(loadedProgress.totalWordsCorrect)")
+                        
+                        self?.currentProgress = loadedProgress
                     } catch {
+                        print("ERROR decoding progress: \(error.localizedDescription)")
                         self?.errorMessage = "Failed to decode user progress: \(error.localizedDescription)"
                     }
                 } else {
+                    print("No existing progress found, creating new user progress")
                     // Create new user progress
                     self?.createNewUserProgress(userId: userId)
                 }
@@ -249,6 +261,7 @@ class UserProgressManager: ObservableObject {
     }
     
     private func createNewUserProgress(userId: String) {
+        print("createNewUserProgress called for user: \(userId)")
         let newProgress = UserProgress(
             userId: userId,
             totalSessions: 0,
@@ -265,10 +278,14 @@ class UserProgressManager: ObservableObject {
             updatedAt: Date()
         )
         
+        print("Created new progress with default values - Total words read: \(newProgress.totalWordsRead), Total words correct: \(newProgress.totalWordsCorrect)")
         saveUserProgress(newProgress)
     }
     
     private func saveUserProgress(_ progress: UserProgress) {
+        print("saveUserProgress called for user: \(progress.userId)")
+        print("Saving progress - Total words read: \(progress.totalWordsRead), Total words correct: \(progress.totalWordsCorrect)")
+        
         do {
             let data = try JSONEncoder().encode(progress)
             var dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
@@ -278,16 +295,21 @@ class UserProgressManager: ObservableObject {
             dict["updatedAt"] = Timestamp(date: progress.updatedAt)
             dict["lastActiveDate"] = Timestamp(date: progress.lastActiveDate)
             
+            print("Saving to Firestore collection 'user_progress', document '\(progress.userId)'")
+            
             db.collection("user_progress").document(progress.userId).setData(dict) { [weak self] error in
                 DispatchQueue.main.async {
                     if let error = error {
+                        print("ERROR saving to Firestore: \(error.localizedDescription)")
                         self?.errorMessage = error.localizedDescription
                     } else {
+                        print("SUCCESS: Progress saved to Firestore")
                         self?.currentProgress = progress
                     }
                 }
             }
         } catch {
+            print("ERROR encoding progress: \(error.localizedDescription)")
             errorMessage = "Failed to encode user progress: \(error.localizedDescription)"
         }
     }
@@ -752,7 +774,14 @@ class UserProgressManager: ObservableObject {
     // MARK: - Progress Updates
     
     private func updateUserProgressAfterReadingSession(_ session: UserReadingSession) {
-        guard var progress = currentProgress else { return }
+        print("updateUserProgressAfterReadingSession called")
+        print("Session data - totalWords: \(session.totalWords), correctWords: \(session.correctWords)")
+        print("Current progress before update: \(currentProgress?.totalWordsRead ?? 0) words read, \(currentProgress?.totalWordsCorrect ?? 0) words correct")
+        
+        guard var progress = currentProgress else { 
+            print("ERROR: currentProgress is nil, cannot update progress")
+            return 
+        }
         
         progress.totalSessions += 1
         progress.totalWordsRead += session.totalWords
@@ -770,6 +799,9 @@ class UserProgressManager: ObservableObject {
         // Update level
         progress.level = calculateUserLevel(accuracy: progress.averageAccuracy, sessions: progress.totalSessions)
         progress.updatedAt = Date()
+        
+        print("Progress after update: \(progress.totalWordsRead) words read, \(progress.totalWordsCorrect) words correct")
+        print("Saving updated progress to Firestore...")
         
         saveUserProgress(progress)
     }
