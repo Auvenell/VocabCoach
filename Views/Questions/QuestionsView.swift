@@ -264,7 +264,7 @@ struct QuestionsView: View {
         }
         .background(
             NavigationLink(
-                destination: SessionResultsView(sessionId: questionSessionId ?? ""),
+                destination: SessionResultsView(sessionId: questionSessionId ?? "", cameFromQuiz: true),
                 isActive: $navigateToSessionResults
             ) {
                 EmptyView()
@@ -806,7 +806,7 @@ struct QuestionsView: View {
                 questionText: questionText,
                 studentAnswer: studentAnswer,
                 llmFeedback: evaluation.feedback,
-                llmReason: evaluation.reasoning,
+                                        llmReason: evaluation.reasoning,
                 score: evaluation.score,
                 isCorrect: isCorrect,
                 timestamp: Date()

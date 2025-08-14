@@ -4,67 +4,149 @@ import FirebaseAuth
 
 struct SessionResultsView: View {
     let sessionId: String
+    let cameFromQuiz: Bool // Controls both back button visibility and bottom button
     @StateObject private var progressManager = UserProgressManager()
     @State private var multipleChoiceResponses: [MultipleChoiceQuestionResponse] = []
     @State private var openEndedResponses: [OpenEndedQuestionResponse] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @EnvironmentObject var headerState: HeaderState
+    @Environment(\.dismiss) private var dismiss
     var onBack: (() -> Void)?
     
+    // Default initializer - not from quiz by default
+    init(sessionId: String, cameFromQuiz: Bool = false, onBack: (() -> Void)? = nil) {
+        self.sessionId = sessionId
+        self.cameFromQuiz = cameFromQuiz
+        self.onBack = onBack
+    }
+    
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    if isLoading {
-                        ProgressView("Loading session results...")
+        Group {
+            if cameFromQuiz {
+                // When coming from quiz, don't wrap in NavigationView to avoid nested navigation
+                ScrollView {
+                    VStack(spacing: 20) {
+                        if isLoading {
+                            ProgressView("Loading session results...")
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else if let error = errorMessage {
+                            VStack(spacing: 16) {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .font(.largeTitle)
+                                    .foregroundColor(.orange)
+                                Text("Error loading results")
+                                    .font(.headline)
+                                Text(error)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else if let error = errorMessage {
-                        VStack(spacing: 16) {
-                            Image(systemName: "exclamationmark.triangle")
-                                .font(.largeTitle)
-                                .foregroundColor(.orange)
-                            Text("Error loading results")
-                                .font(.headline)
-                            Text(error)
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else {
-                        // Session Summary
-                        SessionSummaryView(
-                            multipleChoiceCount: multipleChoiceResponses.count,
-                            openEndedCount: openEndedResponses.count,
-                            multipleChoiceCorrect: multipleChoiceResponses.filter { $0.isCorrect }.count,
-                            openEndedCorrect: openEndedResponses.filter { $0.isCorrect }.count
-                        )
-                        
-                        // Multiple Choice Results
-                        if !multipleChoiceResponses.isEmpty {
-                            MultipleChoiceResultsView(responses: multipleChoiceResponses)
-                        }
-                        
-                        // Open Ended Results
-                        if !openEndedResponses.isEmpty {
-                            OpenEndedResultsView(responses: openEndedResponses)
+                        } else {
+                            // Session Summary
+                            SessionSummaryView(
+                                multipleChoiceCount: multipleChoiceResponses.count,
+                                openEndedCount: openEndedResponses.count,
+                                multipleChoiceCorrect: multipleChoiceResponses.filter { $0.isCorrect }.count,
+                                openEndedCorrect: openEndedResponses.filter { $0.isCorrect }.count
+                            )
+                            
+                            // Multiple Choice Results
+                            if !multipleChoiceResponses.isEmpty {
+                                MultipleChoiceResultsView(responses: multipleChoiceResponses)
+                            }
+                            
+                            // Open Ended Results
+                            if !openEndedResponses.isEmpty {
+                                OpenEndedResultsView(responses: openEndedResponses)
+                            }
+                            
+                            // Back to Welcome button (only show when coming from quiz)
+                            VStack(spacing: 16) {
+                                Divider()
+                                    .padding(.vertical)
+                                
+                                NavigationLink(destination: WelcomeView(onStartPractice: {})) {
+                                    HStack {
+                                        Image(systemName: "house.fill")
+                                        Text("Go Home")
+                                    }
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.blue)
+                                    .cornerRadius(12)
+                                }
+                                .padding(.horizontal)
+                            }
                         }
                     }
+                    .padding()
                 }
-                .padding()
-            }
-            .navigationTitle("Session Results")
-            .navigationBarTitleDisplayMode(.large)
-            .onAppear {
-                setupHeader()
-                loadSessionResults()
+                .navigationTitle("Session Results")
+                .navigationBarTitleDisplayMode(.large)
+                .navigationBarBackButtonHidden(true)
+                .onAppear {
+                    setupHeader()
+                    loadSessionResults()
+                }
+            } else {
+                // When NOT coming from quiz, use NavigationView for standalone presentation
+                NavigationView {
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            if isLoading {
+                                ProgressView("Loading session results...")
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            } else if let error = errorMessage {
+                                VStack(spacing: 16) {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .font(.largeTitle)
+                                        .foregroundColor(.orange)
+                                    Text("Error loading results")
+                                        .font(.headline)
+                                    Text(error)
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                        .multilineTextAlignment(.center)
+                                }
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            } else {
+                                // Session Summary
+                                SessionSummaryView(
+                                    multipleChoiceCount: multipleChoiceResponses.count,
+                                    openEndedCount: openEndedResponses.count,
+                                    multipleChoiceCorrect: multipleChoiceResponses.filter { $0.isCorrect }.count,
+                                    openEndedCorrect: openEndedResponses.filter { $0.isCorrect }.count
+                                )
+                                
+                                // Multiple Choice Results
+                                if !multipleChoiceResponses.isEmpty {
+                                    MultipleChoiceResultsView(responses: multipleChoiceResponses)
+                                }
+                                
+                                // Open Ended Results
+                                if !openEndedResponses.isEmpty {
+                                    OpenEndedResultsView(responses: openEndedResponses)
+                                }
+                            }
+                        }
+                        .padding()
+                    }
+                    .navigationTitle("Session Results")
+                    .navigationBarTitleDisplayMode(.large)
+                    .onAppear {
+                        setupHeader()
+                        loadSessionResults()
+                    }
+                }
             }
         }
     }
     
     private func setupHeader() {
-        headerState.showBackButton = true
         headerState.backButtonAction = onBack
         headerState.title = "Session Results"
         headerState.titleIcon = "doc.text.fill"
