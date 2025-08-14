@@ -36,3 +36,5 @@ VocabCoach is an iOS mobile app designed to help users improve their spoken Engl
 - Hold device reasonably close to the face/mouth
 
 **VocabCoach** - Making English pronunciation practice engaging and effective
+
+Work in Progress
