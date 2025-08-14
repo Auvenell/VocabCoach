@@ -295,15 +295,33 @@ struct QuestionsView: View {
             updateHeaderTitle()
             
             viewModel.fetchQuestions(for: articleId)
-            // Initialize vocabularyWords from practice session or article
+            // Initialize vocabularyWords to always have 5 words
             if let session = practiceSession, !session.incorrectImportantWordsSet.isEmpty {
-                vocabularyWords = Array(session.incorrectImportantWordsSet)
+                // Start with incorrect words from practice session
+                let incorrectWords = Array(session.incorrectImportantWordsSet)
                     .sorted()
                     .map { word in
                         // Remove punctuation and capitalize first letter
                         let cleanWord = word.trimmingCharacters(in: .punctuationCharacters)
                         return cleanWord.prefix(1).uppercased() + cleanWord.dropFirst().lowercased()
                     }
+                
+                // If we have fewer than 5 incorrect words, add important words from article
+                if incorrectWords.count < 5 {
+                    let additionalWords = getImportantWordsFromArticle()
+                        .filter { word in
+                            // Filter out words that are already in incorrect words
+                            !incorrectWords.contains { incorrectWord in
+                                incorrectWord.lowercased() == word.lowercased()
+                            }
+                        }
+                        .prefix(5 - incorrectWords.count)
+                    
+                    vocabularyWords = incorrectWords + Array(additionalWords)
+                } else {
+                    // If we have 5 or more incorrect words, take the first 5
+                    vocabularyWords = Array(incorrectWords.prefix(5))
+                }
             } else {
                 vocabularyWords = getImportantWordsFromArticle()
             }
