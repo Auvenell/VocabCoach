@@ -170,8 +170,8 @@ struct QuestionsView: View {
                                         selectedWord = word
                                         showDictionary(for: word)
                                     },
-                                    onMultipleChoiceAnswer: { isCorrect, questionNumber, questionText, studentChoice, correctChoice in
-                                        trackMultipleChoiceAnswer(isCorrect: isCorrect, questionNumber: questionNumber, questionText: questionText, studentChoice: studentChoice, correctChoice: correctChoice)
+                                    onMultipleChoiceAnswer: { isCorrect, questionNumber, questionText, studentChoice, correctChoice, studentChoiceText, correctChoiceText in
+                                        trackMultipleChoiceAnswer(isCorrect: isCorrect, questionNumber: questionNumber, questionText: questionText, studentChoice: studentChoice, correctChoice: correctChoice, studentChoiceText: studentChoiceText, correctChoiceText: correctChoiceText)
                                     },
                                     onOpenEndedAnswer: { isCorrect in
                                         // We don't need to track here since trackOpenEndedAnswer is called in evaluateWithLLM
@@ -470,7 +470,7 @@ struct QuestionsView: View {
         }
     }
     
-    private func trackMultipleChoiceAnswer(isCorrect: Bool, questionNumber: Int, questionText: String, studentChoice: String, correctChoice: String) {
+    private func trackMultipleChoiceAnswer(isCorrect: Bool, questionNumber: Int, questionText: String, studentChoice: String, correctChoice: String, studentChoiceText: String, correctChoiceText: String) {
         // Only track if multiple choice section is not completed
         guard !multipleChoiceSectionCompleted else { return }
         
@@ -478,12 +478,12 @@ struct QuestionsView: View {
             multipleChoiceCorrect += 1
         }
         
-        // Create detailed response
+        // Create detailed response with new array format
         let response = MultipleChoiceQuestionResponse(
             questionNumber: questionNumber,
             questionText: questionText,
-            studentAnswer: studentChoice,
-            correctAnswer: correctChoice,
+            studentAnswer: [studentChoice, studentChoiceText], // [choice_identifier, choice_text]
+            correctAnswer: [correctChoice, correctChoiceText], // [choice_identifier, choice_text]
             isCorrect: isCorrect,
             timestamp: Date()
         )

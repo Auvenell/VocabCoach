@@ -15,7 +15,7 @@ struct QuestionContentView: View {
     @Binding var recordingVocabularyWord: String?
     let speechManager: SpeechRecognitionManager
     let onWordTap: (String) -> Void
-    let onMultipleChoiceAnswer: (Bool, Int, String, String, String) -> Void // isCorrect, questionNumber, questionText, studentChoice, correctChoice
+    let onMultipleChoiceAnswer: (Bool, Int, String, String, String, String, String) -> Void // isCorrect, questionNumber, questionText, studentChoice, correctChoice, studentChoiceText, correctChoiceText
     let onOpenEndedAnswer: (Bool) -> Void
     let onVocabularyAnswer: (Bool) -> Void
     let articleContent: String
@@ -56,8 +56,8 @@ struct QuestionContentView: View {
                             let studentChoice = choiceMapping[answer] ?? ""
                             let correctChoice = mcQuestion.answer // Already in choice_a format
                             
-                            // Call the new tracking function with choice letter format
-                            onMultipleChoiceAnswer(isCorrect, questionIndex + 1, mcQuestion.questionText, studentChoice, correctChoice)
+                            // Call the new tracking function with choice letter format and choice text
+                            onMultipleChoiceAnswer(isCorrect, questionIndex + 1, mcQuestion.questionText, studentChoice, correctChoice, answer, getCorrectAnswerText(for: mcQuestion))
                             
                             // Debug logging
                             print("Multiple Choice Question: \(mcQuestion.questionText)")

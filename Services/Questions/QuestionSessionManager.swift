@@ -63,7 +63,7 @@ class QuestionSessionManager: ObservableObject {
         }
     }
     
-    func trackMultipleChoiceAnswer(isCorrect: Bool, questionNumber: Int, questionText: String, studentChoice: String, correctChoice: String) {
+    func trackMultipleChoiceAnswer(isCorrect: Bool, questionNumber: Int, questionText: String, studentChoice: String, correctChoice: String, studentChoiceText: String, correctChoiceText: String) {
         // Only track if multiple choice section is not completed
         guard !multipleChoiceSectionCompleted else { return }
         
@@ -71,12 +71,12 @@ class QuestionSessionManager: ObservableObject {
             multipleChoiceCorrect += 1
         }
         
-        // Create detailed response
+        // Create detailed response with new array format
         let response = MultipleChoiceQuestionResponse(
             questionNumber: questionNumber,
             questionText: questionText,
-            studentAnswer: studentChoice,
-            correctAnswer: correctChoice,
+            studentAnswer: [studentChoice, studentChoiceText], // [choice_identifier, choice_text]
+            correctAnswer: [correctChoice, correctChoiceText], // [choice_identifier, choice_text]
             isCorrect: isCorrect,
             timestamp: Date()
         )

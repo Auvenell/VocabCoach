@@ -23,8 +23,8 @@ struct OpenEndedQuestionResponse: Codable {
 struct MultipleChoiceQuestionResponse: Codable {
     let questionNumber: Int
     let questionText: String
-    let studentAnswer: String // choice_a, choice_b, choice_c, choice_d
-    let correctAnswer: String // choice_a, choice_b, choice_c, choice_d
+    let studentAnswer: [String] // [choice_identifier, choice_text] e.g. ["choice_a", "First option"]
+    let correctAnswer: [String] // [choice_identifier, choice_text] e.g. ["choice_a", "First option"]
     let isCorrect: Bool
     let timestamp: Date
 }
