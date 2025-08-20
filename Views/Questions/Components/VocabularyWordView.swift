@@ -13,7 +13,6 @@ struct VocabularyWordView: View {
     let onStopRecording: () -> Void
     let onAnswerChanged: (String) -> Void
     let onLockAnswer: () -> Void
-    let onUnlockAnswer: () -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -78,8 +77,7 @@ struct VocabularyWordView: View {
                 onStartRecording: onStartRecording,
                 onStopRecording: onStopRecording,
                 onAnswerChanged: onAnswerChanged,
-                onLockAnswer: onLockAnswer,
-                onUnlockAnswer: onUnlockAnswer
+                onLockAnswer: onLockAnswer
             )
         }
         .padding(20)

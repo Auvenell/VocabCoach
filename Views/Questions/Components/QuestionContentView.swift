@@ -112,9 +112,6 @@ struct QuestionContentView: View {
                                     print("Is Correct: \(isCorrect)")
                                 }
                             }
-                        },
-                        onUnlockAnswer: {
-                            unlockAnswer(for: oeQuestion.questionText)
                         }
                     )
                 }
@@ -145,9 +142,6 @@ struct QuestionContentView: View {
                             // Track vocabulary answer as correct if it has content
                             let hasAnswer = !(vocabularyAnswers[word] ?? "").isEmpty
                             onVocabularyAnswer(hasAnswer)
-                        },
-                        onUnlockAnswer: {
-                            unlockVocabularyAnswer(for: word)
                         }
                     )
                 }
@@ -176,10 +170,6 @@ struct QuestionContentView: View {
         openEndedAnswers[questionText] = editingAnswers[questionText] ?? ""
     }
     
-    private func unlockAnswer(for questionText: String) {
-        lockedAnswers.remove(questionText)
-    }
-    
     private func startVocabularyRecording(for word: String) {
         recordingVocabularyWord = word
         speechManager.startListening()
@@ -194,10 +184,6 @@ struct QuestionContentView: View {
     private func lockVocabularyAnswer(for word: String) {
         vocabularyLockedAnswers.insert(word)
         vocabularyAnswers[word] = vocabularyEditingAnswers[word] ?? ""
-    }
-    
-    private func unlockVocabularyAnswer(for word: String) {
-        vocabularyLockedAnswers.remove(word)
     }
 }
 

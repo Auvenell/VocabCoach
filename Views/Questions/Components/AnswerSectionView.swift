@@ -11,7 +11,6 @@ struct AnswerSectionView: View {
     let onStopRecording: () -> Void
     let onAnswerChanged: (String) -> Void
     let onLockAnswer: () -> Void
-    let onUnlockAnswer: () -> Void
     
     var body: some View {
         VStack(spacing: 12) {
@@ -166,33 +165,29 @@ struct AnswerSectionView: View {
                         .opacity(isLocked ? 0.5 : 1.0)
                     }
                     
-                    // Lock/Unlock Button
-                    Button(action: {
-                        if isLocked {
-                            onUnlockAnswer()
-                        } else {
-                            onLockAnswer()
+                    // Lock Button (only shown when not locked)
+                    if !isLocked {
+                        Button(action: onLockAnswer) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "lock.open.fill")
+                                    .font(.system(size: 16, weight: .semibold))
+                                Text("Lock Answer")
+                                    .font(.system(size: 16, weight: .semibold))
+                            }
+                            .foregroundColor(.blue)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.blue, lineWidth: 2)
+                            )
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.blue.opacity(0.05))
+                            )
                         }
-                    }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: isLocked ? "lock.fill" : "lock.open.fill")
-                                .font(.system(size: 16, weight: .semibold))
-                            Text(isLocked ? "Unlock" : "Lock Answer")
-                                .font(.system(size: 16, weight: .semibold))
-                        }
-                        .foregroundColor(isLocked ? .green : .blue)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(isLocked ? Color.green : Color.blue, lineWidth: 2)
-                        )
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(isLocked ? Color.green.opacity(0.05) : Color.blue.opacity(0.05))
-                        )
+                        .buttonStyle(PlainButtonStyle())
                     }
-                    .buttonStyle(PlainButtonStyle())
                 }
             } else if !isRecording {
                 // Initial Record Button
@@ -237,8 +232,7 @@ struct AnswerSectionView: View {
             onStartRecording: {},
             onStopRecording: {},
             onAnswerChanged: { _ in },
-            onLockAnswer: {},
-            onUnlockAnswer: {}
+            onLockAnswer: {}
         )
         .padding()
         .background(Color(.systemGray6))
@@ -255,8 +249,7 @@ struct AnswerSectionView: View {
             onStartRecording: {},
             onStopRecording: {},
             onAnswerChanged: { _ in },
-            onLockAnswer: {},
-            onUnlockAnswer: {}
+            onLockAnswer: {}
         )
         .padding()
         .background(Color(.systemGray6))
@@ -273,8 +266,7 @@ struct AnswerSectionView: View {
             onStartRecording: {},
             onStopRecording: {},
             onAnswerChanged: { _ in },
-            onLockAnswer: {},
-            onUnlockAnswer: {}
+            onLockAnswer: {}
         )
         .padding()
         .background(Color(.systemGray6))
