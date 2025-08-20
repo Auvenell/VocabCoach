@@ -19,7 +19,6 @@ struct ContentView: View {
     @EnvironmentObject var userSession: UserSession
     @StateObject private var headerState = HeaderState()
     @State private var isSidebarShowing = false
-    @State private var showingParagraphSelector = false
     @State private var showingProgressDashboard = false
 
     var body: some View {
@@ -93,7 +92,7 @@ struct ContentView: View {
                     })
                     .environmentObject(headerState)
                 } else {
-                    ReadingPracticeView(showingParagraphSelector: $showingParagraphSelector)
+                    ReadingPracticeView()
                         .environmentObject(headerState)
                 }
 
@@ -104,7 +103,7 @@ struct ContentView: View {
             SidebarView(
                 isShowing: $isSidebarShowing,
                 onSelectText: {
-                    showingParagraphSelector = true
+                    // Navigate to paragraph selector - this will be handled by the sidebar
                 },
                 onSelectProgress: {
                     showingProgressDashboard = true

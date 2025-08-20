@@ -10,7 +10,6 @@ struct ReadingPracticeView: View {
 
     @State private var currentSession: ReadingSession?
     @State private var selectedParagraph: PracticeParagraph?
-    @Binding var showingParagraphSelector: Bool
     @State private var showingResults = false
     @State private var feedbackMessage = ""
     @State private var scrollTargetIndex: Int? = nil
@@ -54,9 +53,15 @@ struct ReadingPracticeView: View {
                         }
                     )
                 } else {
-                    WelcomeView {
-                        showingParagraphSelector = true
-                    }
+                    ParagraphSelectorView(
+                        dataManager: dataManager,
+                        selectedParagraph: $selectedParagraph,
+                        onParagraphSelected: { paragraph in
+                            selectedParagraph = paragraph
+                            startNewSession(with: paragraph)
+                        }
+                    )
+                    .navigationBarHidden(true)
                 }
             }
             .padding()
@@ -67,17 +72,6 @@ struct ReadingPracticeView: View {
                     sessionId: currentSession?.sessionId
                 )
                 .environmentObject(headerState)
-            }
-            .navigationDestination(isPresented: $showingParagraphSelector) {
-                ParagraphSelectorView(
-                    dataManager: dataManager,
-                    selectedParagraph: $selectedParagraph,
-                    onParagraphSelected: { paragraph in
-                        selectedParagraph = paragraph
-                        showingParagraphSelector = false
-                        startNewSession(with: paragraph)
-                    }
-                )
             }
             .alert("Feedback", isPresented: .constant(!feedbackMessage.isEmpty)) {
                 Button("OK") {

@@ -31,7 +31,7 @@ struct RecentSessionsView: View {
             } else {
                 LazyVStack(spacing: 12) {
                     ForEach(sessions, id: \.sessionId) { session in
-                        NavigationLink(destination: SessionResultsView(sessionId: session.sessionId)) {
+                        NavigationLink(destination: SessionResultsView(sessionId: session.sessionId, cameFromQuiz: false)) {
                             RecentSessionCard(session: session)
                         }
                         .buttonStyle(PlainButtonStyle())

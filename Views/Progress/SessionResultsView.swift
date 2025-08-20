@@ -12,13 +12,11 @@ struct SessionResultsView: View {
     @State private var errorMessage: String?
     @EnvironmentObject var headerState: HeaderState
     @Environment(\.dismiss) private var dismiss
-    var onBack: (() -> Void)?
     
     // Default initializer - not from quiz by default
-    init(sessionId: String, cameFromQuiz: Bool = false, onBack: (() -> Void)? = nil) {
+    init(sessionId: String, cameFromQuiz: Bool = false) {
         self.sessionId = sessionId
         self.cameFromQuiz = cameFromQuiz
-        self.onBack = onBack
     }
     
     var body: some View {
@@ -67,7 +65,7 @@ struct SessionResultsView: View {
                                 Divider()
                                     .padding(.vertical)
                                 
-                                NavigationLink(destination: WelcomeView(onStartPractice: {})) {
+                                NavigationLink(destination: ReadingPracticeView()) {
                                     HStack {
                                         Image(systemName: "house.fill")
                                         Text("Go Home")
@@ -147,7 +145,7 @@ struct SessionResultsView: View {
     }
     
     private func setupHeader() {
-        headerState.backButtonAction = onBack
+        headerState.backButtonAction = nil // Removed onBack
         headerState.title = "Session Results"
         headerState.titleIcon = "doc.text.fill"
         headerState.titleColor = .blue
@@ -456,5 +454,5 @@ struct OpenEndedResultCard: View {
 }
 
 #Preview {
-    SessionResultsView(sessionId: "preview-session-id")
+    SessionResultsView(sessionId: "preview-session-id", cameFromQuiz: false)
 }
