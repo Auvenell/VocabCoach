@@ -408,17 +408,7 @@ struct QuestionsView: View {
         // Save the transcribed text as the answer
         openEndedAnswers[questionText] = editingAnswers[questionText] ?? ""
     }
-    
-    private func lockAnswer(for questionText: String) {
-        lockedAnswers.insert(questionText)
-        // Save the current editing answer as the final answer
-        openEndedAnswers[questionText] = editingAnswers[questionText] ?? ""
-    }
-    
-    private func unlockAnswer(for questionText: String) {
-        lockedAnswers.remove(questionText)
-    }
-    
+      
     // Vocabulary recording functions
     private func startVocabularyRecording(for word: String) {
         recordingVocabularyWord = word
@@ -430,16 +420,6 @@ struct QuestionsView: View {
         speechManager.stopListening()
         // Save the transcribed text as the answer
         vocabularyAnswers[word] = vocabularyEditingAnswers[word] ?? ""
-    }
-    
-    private func lockVocabularyAnswer(for word: String) {
-        vocabularyLockedAnswers.insert(word)
-        // Save the current editing answer as the final answer
-        vocabularyAnswers[word] = vocabularyEditingAnswers[word] ?? ""
-    }
-    
-    private func unlockVocabularyAnswer(for word: String) {
-        vocabularyLockedAnswers.remove(word)
     }
     
     // MARK: - Question Session Tracking
