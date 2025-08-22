@@ -110,7 +110,7 @@ class LLMEvaluationService: ObservableObject {
         
         // Prepare the request body for local LLM (OpenAI-compatible format)
         let requestBody: [String: Any] = [
-            "model": "google/gemma-3-12b", // Your local model name
+            "model": "openai/gpt-oss-20b", // Your local model name
             "messages": [
                 [
                     "role": "user",
@@ -162,21 +162,33 @@ class LLMEvaluationService: ObservableObject {
                let message = firstChoice["message"] as? [String: Any],
                let content = message["content"] as? String {
                 
-                // Extract JSON from markdown code blocks (```json ... ```)
-                guard let jsonContent = extractJSONFromMarkdown(content) else {
-                    fatalError("Failed to extract JSON from markdown in LLM response")
+                // First try to parse the content directly as JSON
+                if let directResponse = parseJSONResponse(content) {
+                    return directResponse
                 }
-                return parseJSONResponse(jsonContent)
+                
+                // Fallback: extract JSON from markdown code blocks (```json ... ```)
+                if let jsonContent = extractJSONFromMarkdown(content) {
+                    return parseJSONResponse(jsonContent)
+                }
+                
+                fatalError("Failed to parse content from OpenAI-compatible response")
             }
         } catch {
             print("Failed to parse OpenAI-compatible response: \(error)")
         }
         
-        // Fallback: try to extract JSON from the raw response
-        guard let jsonContent = extractJSONFromMarkdown(response) else {
-            fatalError("Failed to extract JSON from markdown in raw LLM response")
+        // Fallback: try to parse the raw response directly as JSON first
+        if let directResponse = parseJSONResponse(response) {
+            return directResponse
         }
-        return parseJSONResponse(jsonContent)
+        
+        // Final fallback: try to extract JSON from markdown in the raw response
+        if let jsonContent = extractJSONFromMarkdown(response) {
+            return parseJSONResponse(jsonContent)
+        }
+        
+        fatalError("Failed to parse LLM response in any format")
     }
     
     private func extractJSONFromMarkdown(_ content: String) -> String? {
@@ -205,19 +217,22 @@ class LLMEvaluationService: ObservableObject {
         return jsonContent
     }
     
-    private func parseJSONResponse(_ jsonString: String) -> EvaluationResponse {
+    private func parseJSONResponse(_ jsonString: String) -> EvaluationResponse? {
         do {
             let data = jsonString.data(using: .utf8)!
             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
             
             guard let score = json?["score"] as? Double else {
-                fatalError("Failed to parse score from JSON response")
+                print("Failed to parse score from JSON response")
+                return nil
             }
             guard let feedback = json?["feedback"] as? String else {
-                fatalError("Failed to parse feedback from JSON response")
+                print("Failed to parse feedback from JSON response")
+                return nil
             }
             guard let reasoning = json?["reasoning"] as? String else {
-                fatalError("Failed to parse reasoning from JSON response")
+                print("Failed to parse reasoning from JSON response")
+                return nil
             }
             
             return EvaluationResponse(
@@ -226,7 +241,8 @@ class LLMEvaluationService: ObservableObject {
                 reasoning: reasoning
             )
         } catch {
-            fatalError("JSON parsing error: \(error)")
+            print("JSON parsing error: \(error)")
+            return nil
         }
     }
     
