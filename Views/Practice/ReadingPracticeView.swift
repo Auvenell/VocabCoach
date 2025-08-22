@@ -31,7 +31,9 @@ struct ReadingPracticeView: View {
                         },
                         onStartStopPractice: {
                             if speechManager.isListening {
-                                stopPractice()
+                                pausePractice()
+                            } else if let session = currentSession, session.isPaused {
+                                resumePractice()
                             } else {
                                 startPractice()
                             }
@@ -83,7 +85,7 @@ struct ReadingPracticeView: View {
 
         }
         .onReceive(speechManager.$transcribedText) { transcription in
-            if currentSession != nil, !transcription.isEmpty {
+            if let session = currentSession, !session.isPaused, !transcription.isEmpty {
                 updateSession(with: transcription)
             }
         }
@@ -96,10 +98,19 @@ struct ReadingPracticeView: View {
             
             // Reset session state to ensure fresh sessions are created
             // This prevents reusing old completed sessions when navigating back
+            print("🔄 ReadingPracticeView appeared - resetting all session state")
+            
+            // Clear all session-related state
             currentSession = nil
             selectedParagraph = nil
             sessionSaved = false
             showQuestions = false
+            
+            // Reset speech and TTS managers to ensure clean state
+            speechManager.reset()
+            ttsManager.stopSpeaking()
+            
+            print("✅ Session state reset complete - ready for fresh session creation")
             
             // Load user progress when view appears
             if let userId = Auth.auth().currentUser?.uid {
@@ -113,6 +124,8 @@ struct ReadingPracticeView: View {
 
 
     private func startNewSession(with paragraph: PracticeParagraph) {
+        print("🚀 Starting completely fresh reading session for paragraph: \(paragraph.title)")
+        
         // Always create a completely fresh session with a new UUID
         // This ensures that even if the same paragraph is selected, we get a new session
         currentSession = ReadingSession(paragraph: paragraph)
@@ -122,7 +135,16 @@ struct ReadingPracticeView: View {
         scrollTargetIndex = 0
         
         // Debug logging to confirm new session creation
-        print("Created new reading session with ID: \(currentSession?.sessionId ?? "unknown") for paragraph: \(paragraph.title)")
+        print("✅ Created new reading session with ID: \(currentSession?.sessionId ?? "unknown")")
+        print("📝 Session details - Total words: \(currentSession?.totalWords ?? 0)")
+        
+        // Verify the session is completely fresh
+        guard let session = currentSession else {
+            print("❌ Failed to create new session")
+            return
+        }
+        
+        print("🆕 Fresh session confirmed - SessionId: \(session.sessionId)")
     }
 
     private func startPractice() {
@@ -142,35 +164,39 @@ struct ReadingPracticeView: View {
         }
     }
 
-    private func stopPractice() {
+    // Pause the current reading session - session is NOT saved to Firestore
+    // Only completed sessions (all words read) get saved automatically
+    private func pausePractice() {
         guard var session = currentSession else { return }
 
-        session.endTime = Date()
+        // Mark session as paused
+        session.isPaused = true
         speechManager.stopListening()
         currentSession = session
 
-        // Save session to progress tracking
-        saveSessionToProgress(session)
+        // Provide feedback about pausing
+        ttsManager.speakFeedback("Session paused. Tap resume to continue.")
+    }
 
-        // Provide final feedback
-        let accuracy = session.accuracy
-        let feedback: String
+    // Resume a paused reading session from exactly where it was left off
+    private func resumePractice() {
+        guard var session = currentSession else { return }
 
-        if accuracy >= 0.9 {
-            feedback = "Excellent reading! Your pronunciation was very accurate."
-        } else if accuracy >= 0.7 {
-            feedback = "Good job! You're making great progress with your pronunciation."
-        } else if accuracy >= 0.5 {
-            feedback = "Keep practicing! Focus on the highlighted words for improvement."
-        } else {
-            feedback = "Don't worry, pronunciation takes time. Try reading more slowly and clearly."
-        }
+        // Resume from where we left off
+        session.isPaused = false
+        speechManager.startListening()
+        currentSession = session
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            ttsManager.speakFeedback(feedback)
+        // Provide feedback about resuming
+        if let currentWord = session.currentWord {
+            ttsManager.speakFeedback("Resuming from: \(currentWord)")
         }
     }
+
+
     
+    // Save completed reading session to Firestore progress tracking
+    // This is ONLY called automatically when user completes reading all words
     private func saveSessionToProgress(_ session: ReadingSession) {
         guard let userId = Auth.auth().currentUser?.uid else { return }
         
@@ -319,6 +345,7 @@ struct ReadingPracticeView: View {
 
         // Stop listening temporarily to clear any buffered audio
         let wasListening = speechManager.isListening
+        let wasPaused = session.isPaused
         if wasListening {
             speechManager.stopListening()
         }
@@ -329,8 +356,8 @@ struct ReadingPracticeView: View {
         // Clear transcription completely
         speechManager.clearTranscription()
 
-        // Restart listening if it was on before
-        if wasListening {
+        // Restart listening if it was on before (but not if it was paused)
+        if wasListening && !wasPaused {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 speechManager.startListening()
             }

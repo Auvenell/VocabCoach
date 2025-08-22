@@ -9,7 +9,7 @@ import Combine
 struct QuestionsView: View {
     let articleId: String
     let practiceSession: ReadingSession? // Optional practice session data
-    let sessionId: String? // SessionId from reading session (IGNORED - always generates new session for safety)
+    let sessionId: String? // SessionId from reading session - maintains connection between reading and question sessions
     @StateObject private var viewModel = ArticleViewModel()
     @StateObject private var speechManager = SpeechRecognitionManager()
     @StateObject private var progressManager = UserProgressManager()
@@ -361,7 +361,11 @@ struct QuestionsView: View {
             
             // Log warning if old sessionId is passed (for debugging)
             if let oldSessionId = sessionId {
-                print("⚠️ WARNING: Old sessionId passed to QuestionsView: \(oldSessionId) - This will be ignored for safety")
+                print("⚠️ WARNING: sessionId passed to QuestionsView: \(oldSessionId)")
+                print("📋 This sessionId should come from a fresh reading session")
+                print("🔗 It will be used to link this question session to the reading session")
+            } else {
+                print("ℹ️ No sessionId passed to QuestionsView - will generate new one")
             }
             
             // Start question session tracking
@@ -522,13 +526,12 @@ struct QuestionsView: View {
     private func createQuestionSessionDocument() {
         guard let userId = Auth.auth().currentUser?.uid else { return }
         
-        // Always generate a new session ID to ensure fresh sessions
-        // This prevents reusing old completed sessions
-        let sessionId = UUID().uuidString
+        // Use the passed sessionId from the reading session to maintain the connection
+        // This ensures question sessions are properly linked to their reading sessions
+        let sessionId = self.sessionId ?? UUID().uuidString
         questionSessionId = sessionId
         
-        print("Creating new question session with ID: \(sessionId) for article: \(articleId)")
-        print("Previous sessionId parameter was: \(self.sessionId ?? "nil")")
+        print("Creating question session linked to reading session: \(sessionId) for article: \(articleId)")
         
         // Create initial session document with basic info
         let initialSessionData: [String: Any] = [
@@ -548,7 +551,7 @@ struct QuestionsView: View {
             if let error = error {
                 print("Error creating question session: \(error.localizedDescription)")
             } else {
-                print("Successfully created question session: \(sessionId)")
+                print("Successfully created question session linked to reading session: \(sessionId)")
             }
         }
     }

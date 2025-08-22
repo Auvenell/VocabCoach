@@ -83,6 +83,7 @@ struct ReadingSession {
     var incorrectImportantWordTimestamps: [String: Date] = [:] // Track when each word was added
     var currentWordAttempts: Int = 0 // Track attempts on current word
     var currentWordStartTime: Date? // Track when we started on current word
+    var isPaused: Bool = false // Track if session is paused
     var accuracy: Double {
         guard totalWords > 0 else { return 0.0 }
         return Double(correctWords) / Double(totalWords)

@@ -40,31 +40,31 @@ struct PracticeSessionView: View {
 
                 // Control buttons
                 VStack(spacing: 12) {
-                    // Start/Stop Reading button (prominent)
-                    Button(action: onStartStopPractice) {
-                        HStack(spacing: 12) {
-                            Image(systemName: isListening ? "waveform.circle.fill" : "play.circle.fill")
-                                .font(.system(size: 32))
-                                .foregroundColor(.white)
-                                .shadow(color: isListening ? .blue.opacity(0.7) : .clear, radius: 10, x: 0, y: 0)
-                                .scaleEffect(isListening ? 1.2 : 1.0)
-                                .animation(.easeInOut(duration: 0.2), value: isListening)
-                            Text(isListening ? "Stop" : "Start Reading")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                        }
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(isListening ? Color.red : Color.green)
-                        .cornerRadius(16)
-                        .shadow(color: isListening ? .blue.opacity(0.5) : .clear, radius: 10, x: 0, y: 0)
-                        .opacity(session.isCompleted ? 0.5 : 1.0)
+                                    // Start/Pause/Resume Reading button (prominent)
+                Button(action: onStartStopPractice) {
+                    HStack(spacing: 12) {
+                        Image(systemName: getButtonIcon())
+                            .font(.system(size: 32))
+                            .foregroundColor(.white)
+                            .shadow(color: getButtonShadowColor(), radius: 10, x: 0, y: 0)
+                            .scaleEffect(isListening ? 1.2 : 1.0)
+                            .animation(.easeInOut(duration: 0.2), value: isListening)
+                        Text(getButtonText())
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
                     }
-                    .accessibilityLabel(isListening ? "Stop Listening" : "Start Reading")
-                    .disabled(session.isCompleted)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(getButtonBackgroundColor())
+                    .cornerRadius(16)
+                    .shadow(color: getButtonShadowColor(), radius: 10, x: 0, y: 0)
+                    .opacity(session.isCompleted ? 0.5 : 1.0)
+                }
+                                .accessibilityLabel(getButtonAccessibilityLabel())
+                .disabled(session.isCompleted)
 
-                    // Reset button - changes behavior based on completion state
+                // Reset button - changes behavior based on completion state
                     Button(action: {
                         if session.isCompleted {
                             onResetSession()
@@ -220,6 +220,68 @@ struct PracticeSessionView: View {
 
                 Spacer()
             }
+        }
+    }
+    
+    // MARK: - Helper Functions for Button State
+    
+    private func getButtonIcon() -> String {
+        if session.isCompleted {
+            return "checkmark.circle.fill"
+        } else if session.isPaused {
+            return "play.circle.fill"
+        } else if isListening {
+            return "pause.circle.fill"
+        } else {
+            return "play.circle.fill"
+        }
+    }
+    
+    private func getButtonText() -> String {
+        if session.isCompleted {
+            return "Completed"
+        } else if session.isPaused {
+            return "Resume Reading"
+        } else if isListening {
+            return "Pause"
+        } else {
+            return "Start Reading"
+        }
+    }
+    
+    private func getButtonBackgroundColor() -> Color {
+        if session.isCompleted {
+            return Color.orange
+        } else if session.isPaused {
+            return Color.green
+        } else if isListening {
+            return Color.gray
+        } else {
+            return Color.green
+        }
+    }
+    
+    private func getButtonShadowColor() -> Color {
+        if session.isCompleted {
+            return Color.clear
+        } else if session.isPaused {
+            return Color.orange.opacity(0.7)
+        } else if isListening {
+            return Color.orange.opacity(0.7)
+        } else {
+            return Color.clear
+        }
+    }
+    
+    private func getButtonAccessibilityLabel() -> String {
+        if session.isCompleted {
+            return "Reading completed"
+        } else if session.isPaused {
+            return "Resume reading"
+        } else if isListening {
+            return "Pause reading"
+        } else {
+            return "Start reading"
         }
     }
 }
