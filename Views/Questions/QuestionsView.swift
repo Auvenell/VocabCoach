@@ -9,7 +9,7 @@ import Combine
 struct QuestionsView: View {
     let articleId: String
     let practiceSession: ReadingSession? // Optional practice session data
-    let sessionId: String? // SessionId from reading session
+    let sessionId: String? // SessionId from reading session (IGNORED - always generates new session for safety)
     @StateObject private var viewModel = ArticleViewModel()
     @StateObject private var speechManager = SpeechRecognitionManager()
     @StateObject private var progressManager = UserProgressManager()
@@ -359,6 +359,11 @@ struct QuestionsView: View {
                 vocabularyWords = getImportantWordsFromArticle()
             }
             
+            // Log warning if old sessionId is passed (for debugging)
+            if let oldSessionId = sessionId {
+                print("⚠️ WARNING: Old sessionId passed to QuestionsView: \(oldSessionId) - This will be ignored for safety")
+            }
+            
             // Start question session tracking
             startQuestionSession()
             
@@ -476,10 +481,14 @@ struct QuestionsView: View {
     @State private var questionSessionId: String?
     
     private func startQuestionSession() {
+        print("Starting fresh question session - resetting all state")
+        
+        // Reset all session state to ensure complete freshness
         sessionStartTime = Date()
         multipleChoiceCorrect = 0
         openEndedScores.removeAll()
         multipleChoiceResponses.removeAll()
+        openEndedResponses.removeAll()
         vocabularyCorrect = 0
         sessionCompleted = false
         multipleChoiceSectionCompleted = false
@@ -488,6 +497,24 @@ struct QuestionsView: View {
         openEndedSectionCompletionTime = nil
         vocabularySectionCompletionTime = nil
         
+        // Clear all answer storage to prevent old answers from persisting
+        selectedAnswers.removeAll()
+        openEndedAnswers.removeAll()
+        editingAnswers.removeAll()
+        lockedAnswers.removeAll()
+        vocabularyAnswers.removeAll()
+        vocabularyEditingAnswers.removeAll()
+        vocabularyLockedAnswers.removeAll()
+        
+        // Reset navigation state
+        currentSectionIndex = 0
+        currentQuestionIndex = 0
+        
+        // Clear any previous session ID
+        questionSessionId = nil
+        
+        print("Session state reset complete. Starting fresh session at: \(sessionStartTime?.formatted() ?? "unknown time")")
+        
         // Create the question session document at the start
         createQuestionSessionDocument()
     }
@@ -495,9 +522,13 @@ struct QuestionsView: View {
     private func createQuestionSessionDocument() {
         guard let userId = Auth.auth().currentUser?.uid else { return }
         
-        // Use the passed sessionId if available, otherwise generate a new one
-        let sessionId = self.sessionId ?? UUID().uuidString
+        // Always generate a new session ID to ensure fresh sessions
+        // This prevents reusing old completed sessions
+        let sessionId = UUID().uuidString
         questionSessionId = sessionId
+        
+        print("Creating new question session with ID: \(sessionId) for article: \(articleId)")
+        print("Previous sessionId parameter was: \(self.sessionId ?? "nil")")
         
         // Create initial session document with basic info
         let initialSessionData: [String: Any] = [

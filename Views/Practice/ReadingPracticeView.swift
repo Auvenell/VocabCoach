@@ -94,6 +94,13 @@ struct ReadingPracticeView: View {
             headerState.titleIcon = "book.fill"
             headerState.titleColor = .blue
             
+            // Reset session state to ensure fresh sessions are created
+            // This prevents reusing old completed sessions when navigating back
+            currentSession = nil
+            selectedParagraph = nil
+            sessionSaved = false
+            showQuestions = false
+            
             // Load user progress when view appears
             if let userId = Auth.auth().currentUser?.uid {
                 progressManager.loadUserProgress(userId: userId)
@@ -106,11 +113,16 @@ struct ReadingPracticeView: View {
 
 
     private func startNewSession(with paragraph: PracticeParagraph) {
+        // Always create a completely fresh session with a new UUID
+        // This ensures that even if the same paragraph is selected, we get a new session
         currentSession = ReadingSession(paragraph: paragraph)
         sessionSaved = false
         speechManager.reset()
         ttsManager.stopSpeaking()
         scrollTargetIndex = 0
+        
+        // Debug logging to confirm new session creation
+        print("Created new reading session with ID: \(currentSession?.sessionId ?? "unknown") for paragraph: \(paragraph.title)")
     }
 
     private func startPractice() {
