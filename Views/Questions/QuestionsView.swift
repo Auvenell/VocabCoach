@@ -206,13 +206,13 @@ struct QuestionsView: View {
                         }
                     )
                     
-                    // Submit button (show when all questions completed)
-                    if allQuestionsCompleted && !sessionCompleted {
+                    // Submit button (show when on last question of last section)
+                    if isOnLastQuestion && !sessionCompleted {
                         VStack(spacing: 12) {
                             Button(action: submitAnswers) {
                                 HStack {
                                     Image(systemName: "checkmark.circle.fill")
-                                    Text("Submit Answers")
+                                    Text("Finish Quiz")
                                 }
                                 .font(.headline)
                                 .foregroundColor(.white)
@@ -222,10 +222,17 @@ struct QuestionsView: View {
                                 .cornerRadius(12)
                             }
                             
-                            Text("All questions completed! Review your answers and submit.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
+                            if allQuestionsCompleted {
+                                Text("All questions completed! Review your answers and submit.")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            } else {
+                                Text("Last one! Review your answers and submit.")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
                         }
                         .padding(.horizontal)
                     }
@@ -931,6 +938,15 @@ struct QuestionsView: View {
         }
         
         return multipleChoiceCompleted && openEndedCompleted && vocabularyCompleted
+    }
+    
+    // Check if user is on the last question of the last section
+    private var isOnLastQuestion: Bool {
+        // Check if we're on the last section
+        guard currentSectionIndex == sections.count - 1 else { return false }
+        
+        // Check if we're on the last question of that section
+        return currentQuestionIndex == totalQuestionsInCurrentSection - 1
     }
     
     // Calculate total points earned
