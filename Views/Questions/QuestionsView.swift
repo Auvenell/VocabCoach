@@ -43,6 +43,11 @@ struct QuestionsView: View {
     @State private var showingSubmitButton: Bool = false
     @State private var showingResults: Bool = false
     
+    // Section completion timestamps
+    @State private var multipleChoiceSectionCompletionTime: Date?
+    @State private var openEndedSectionCompletionTime: Date?
+    @State private var vocabularySectionCompletionTime: Date?
+    
     // Calculated points from database (to be used in quiz complete popup)
     @State private var calculatedTotalPoints: Int = 0
     @State private var calculatedEarnedPoints: Int = 0
@@ -479,6 +484,9 @@ struct QuestionsView: View {
         sessionCompleted = false
         multipleChoiceSectionCompleted = false
         openEndedSectionCompleted = false
+        multipleChoiceSectionCompletionTime = nil
+        openEndedSectionCompletionTime = nil
+        vocabularySectionCompletionTime = nil
         
         // Create the question session document at the start
         createQuestionSessionDocument()
@@ -551,6 +559,7 @@ struct QuestionsView: View {
         guard !multipleChoiceSectionCompleted else { return }
         
         multipleChoiceSectionCompleted = true
+        multipleChoiceSectionCompletionTime = Date()
         
         // Save all multiple choice responses to Firestore
         guard let userId = Auth.auth().currentUser?.uid,
@@ -558,7 +567,7 @@ struct QuestionsView: View {
         
         saveMultipleChoiceResponsesCollection(userId: userId, questionSessionId: sessionId)
         
-        print("Multiple choice section completed. Saved \(multipleChoiceResponses.count) responses to Firestore.")
+        print("Multiple choice section completed at \(multipleChoiceSectionCompletionTime?.formatted() ?? "unknown time"). Saved \(multipleChoiceResponses.count) responses to Firestore.")
     }
     
     // Complete open-ended section (no Firestore upload needed)
@@ -620,8 +629,9 @@ struct QuestionsView: View {
         print("Auto-locked \(autoLockedCount) answers, evaluated \(evaluatedCount) answers")
         
         openEndedSectionCompleted = true
+        openEndedSectionCompletionTime = Date()
         
-        print("Open-ended section completed with auto-locked answers. Total questions: \(viewModel.openEndedQuestions.count)")
+        print("Open-ended section completed at \(openEndedSectionCompletionTime?.formatted() ?? "unknown time") with auto-locked answers. Total questions: \(viewModel.openEndedQuestions.count)")
     }
     
     private func saveQuestionSessions() {
@@ -636,14 +646,14 @@ struct QuestionsView: View {
             !viewModel.multipleChoiceQuestions.isEmpty ? (
                 totalQuestions: viewModel.multipleChoiceQuestions.count,
                 correctAnswers: multipleChoiceCorrect,
-                timeSpent: timeSpent * Double(viewModel.multipleChoiceQuestions.count) / Double(getTotalQuestions())
+                timeSpent: multipleChoiceSectionCompletionTime?.timeIntervalSince(sessionStartTime ?? Date()) ?? 0
             ) : nil
         
         let openEndedData: (totalQuestions: Int, correctAnswers: Int, timeSpent: TimeInterval, scores: [Double])? = 
             !viewModel.openEndedQuestions.isEmpty ? (
                 totalQuestions: viewModel.openEndedQuestions.count,
                 correctAnswers: openEndedScores.filter { $0 > 0.6 }.count, // Count of questions with score > 0.6
-                timeSpent: timeSpent * Double(viewModel.openEndedQuestions.count) / Double(getTotalQuestions()),
+                timeSpent: openEndedSectionCompletionTime?.timeIntervalSince(multipleChoiceSectionCompletionTime ?? Date()) ?? 0,
                 scores: openEndedScores
             ) : nil
         
@@ -651,7 +661,7 @@ struct QuestionsView: View {
             !vocabularyWords.isEmpty ? (
                 totalQuestions: vocabularyWords.count,
                 correctAnswers: vocabularyCorrect,
-                timeSpent: timeSpent * Double(vocabularyWords.count) / Double(getTotalQuestions())
+                timeSpent: vocabularySectionCompletionTime?.timeIntervalSince(openEndedSectionCompletionTime ?? Date()) ?? 0
             ) : nil
         
         // Update the existing question session with final data
@@ -680,6 +690,9 @@ struct QuestionsView: View {
     }
     
     private func submitAnswers() {
+
+        vocabularySectionCompletionTime = Date()
+
         // Complete multiple choice section if not already completed
         if !multipleChoiceSectionCompleted && !viewModel.multipleChoiceQuestions.isEmpty {
             completeMultipleChoiceSection()
@@ -702,8 +715,6 @@ struct QuestionsView: View {
                viewModel.openEndedQuestions.count + 
                vocabularyWords.count
     }
-    
-
     
     // Fetch article content for LLM evaluation
     private func fetchArticleContent() {
