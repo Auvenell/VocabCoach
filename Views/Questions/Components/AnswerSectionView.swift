@@ -214,6 +214,8 @@ struct AnswerSectionView: View {
                     .shadow(color: .blue.opacity(0.3), radius: 6, x: 0, y: 3)
                 }
                 .buttonStyle(PlainButtonStyle())
+                .disabled(isLocked)
+                .opacity(isLocked ? 0.5 : 1.0)
             }
         }
     }

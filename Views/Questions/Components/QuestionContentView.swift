@@ -21,6 +21,7 @@ struct QuestionContentView: View {
     let articleContent: String
     let evaluateWithLLM: (String, String, String, String, Int) async -> Bool
     let multipleChoiceSectionCompleted: Bool
+    let openEndedSectionCompleted: Bool
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -70,50 +71,82 @@ struct QuestionContentView: View {
                 }
             case .openEnded:
                 if let oeQuestion = question as? ComprehensionQuestion {
-                    OpenEndedQuestionView(
-                        questionNumber: questionIndex + 1,
-                        question: oeQuestion,
-                        answer: openEndedAnswers[oeQuestion.questionText] ?? "",
-                        editingAnswer: editingAnswers[oeQuestion.questionText] ?? "",
-                        isLocked: lockedAnswers.contains(oeQuestion.questionText),
-                        isRecording: recordingQuestion == oeQuestion.questionText,
-                        transcribedText: speechManager.transcribedText,
-                        onStartRecording: {
-                            startRecording(for: oeQuestion.questionText)
-                        },
-                        onStopRecording: {
-                            stopRecording(for: oeQuestion.questionText)
-                        },
-                        onAnswerChanged: { newAnswer in
-                            editingAnswers[oeQuestion.questionText] = newAnswer
-                        },
-                        onLockAnswer: {
-                            lockAnswer(for: oeQuestion.questionText)
-                            // Evaluate open-ended answer using LLM
-                            let userAnswer = openEndedAnswers[oeQuestion.questionText] ?? ""
-                            let expectedAnswer = oeQuestion.answer
-                            
-                            Task {
-                                let isCorrect = await evaluateWithLLM(
-                                    articleContent.isEmpty ? "No article content available" : articleContent,
-                                    oeQuestion.questionText,
-                                    expectedAnswer,
-                                    userAnswer,
-                                    questionIndex + 1
-                                )
+                    VStack(spacing: 16) {
+                        // Show completion message if section is completed
+                        if openEndedSectionCompleted {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                Text("Open-ended section completed - answers locked")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 4)
+                            .padding(.horizontal, 8)
+                            .background(Color.green.opacity(0.1))
+                            .cornerRadius(6)
+                        }
+                        
+                        OpenEndedQuestionView(
+                            questionNumber: questionIndex + 1,
+                            question: oeQuestion,
+                            answer: openEndedAnswers[oeQuestion.questionText] ?? "",
+                            editingAnswer: editingAnswers[oeQuestion.questionText] ?? "",
+                            isLocked: lockedAnswers.contains(oeQuestion.questionText) || openEndedSectionCompleted,
+                            isRecording: recordingQuestion == oeQuestion.questionText,
+                            transcribedText: speechManager.transcribedText,
+                            onStartRecording: {
+                                // Only allow recording if section is not completed
+                                guard !openEndedSectionCompleted else { 
+                                    print("Open-ended section completed - cannot record answers")
+                                    return 
+                                }
+                                startRecording(for: oeQuestion.questionText)
+                            },
+                            onStopRecording: {
+                                stopRecording(for: oeQuestion.questionText)
+                            },
+                            onAnswerChanged: { newAnswer in
+                                // Only allow editing if section is not completed
+                                guard !openEndedSectionCompleted else { 
+                                    print("Open-ended section completed - cannot edit answers")
+                                    return 
+                                }
+                                editingAnswers[oeQuestion.questionText] = newAnswer
+                            },
+                            onLockAnswer: {
+                                // Only allow locking if section is not completed
+                                guard !openEndedSectionCompleted else { 
+                                    print("Open-ended section completed - cannot lock answers")
+                                    return 
+                                }
+                                lockAnswer(for: oeQuestion.questionText)
+                                // Evaluate open-ended answer using LLM
+                                let userAnswer = openEndedAnswers[oeQuestion.questionText] ?? ""
+                                let expectedAnswer = oeQuestion.answer
                                 
-                                await MainActor.run {
-                                    onOpenEndedAnswer(isCorrect)
+                                Task {
+                                    let isCorrect = await evaluateWithLLM(
+                                        articleContent.isEmpty ? "No article content available" : articleContent,
+                                        oeQuestion.questionText,
+                                        expectedAnswer,
+                                        userAnswer,
+                                        questionIndex + 1
+                                    )
                                     
-                                    // Debug logging
-                                    print("Open-Ended Question (LLM): \(oeQuestion.questionText)")
-                                    print("User Answer: \(userAnswer)")
-                                    print("Expected Answer: \(expectedAnswer)")
-                                    print("Is Correct: \(isCorrect)")
+                                    await MainActor.run {
+                                        onOpenEndedAnswer(isCorrect)
+                                        
+                                        // Debug logging
+                                        print("Open-Ended Question (LLM): \(oeQuestion.questionText)")
+                                        print("User Answer: \(userAnswer)")
+                                        print("Expected Answer: \(expectedAnswer)")
+                                        print("Is Correct: \(isCorrect)")
+                                    }
                                 }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             case .vocabulary:
                 if let word = question as? String {

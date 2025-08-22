@@ -56,8 +56,12 @@ struct QuestionsView: View {
     // Multiple choice section completion tracking
     @State private var multipleChoiceSectionCompleted: Bool = false
     
+    // Open-ended section completion tracking
+    @State private var openEndedSectionCompleted: Bool = false
+    
     // Confirmation modal state
     @State private var showingMultipleChoiceConfirmation: Bool = false
+    @State private var showingOpenEndedConfirmation: Bool = false
     
     // Navigation state
     @State private var currentSectionIndex = 0
@@ -183,7 +187,8 @@ struct QuestionsView: View {
                                     evaluateWithLLM: { article, questionText, expectedAnswer, studentAnswer, questionNumber in
                                         await evaluateWithLLM(article, questionText, expectedAnswer, studentAnswer, questionNumber)
                                                         },
-                                    multipleChoiceSectionCompleted: multipleChoiceSectionCompleted
+                                    multipleChoiceSectionCompleted: multipleChoiceSectionCompleted,
+                                    openEndedSectionCompleted: openEndedSectionCompleted
                                 )
                             }
                         }
@@ -286,6 +291,22 @@ struct QuestionsView: View {
                 totalQuestions: viewModel.multipleChoiceQuestions.count
             )
         }
+        .sheet(isPresented: $showingOpenEndedConfirmation) {
+            OpenEndedConfirmationView(
+                onConfirm: {
+                    completeOpenEndedSection()
+                    showingOpenEndedConfirmation = false
+                    // Move to next section
+                    currentSectionIndex += 1
+                    currentQuestionIndex = 0
+                },
+                onCancel: {
+                    showingOpenEndedConfirmation = false
+                },
+                answeredQuestions: openEndedAnswers.count,
+                totalQuestions: viewModel.openEndedQuestions.count
+            )
+        }
         .onAppear {
             // Set up header
             headerState.showBackButton = true
@@ -346,6 +367,11 @@ struct QuestionsView: View {
                 completeMultipleChoiceSection()
             }
             
+            // Complete open-ended section if not already completed
+            if !openEndedSectionCompleted && !viewModel.openEndedQuestions.isEmpty {
+                completeOpenEndedSection()
+            }
+            
             // Save question sessions if not already completed
             if !sessionCompleted {
                 saveQuestionSessions()
@@ -378,6 +404,12 @@ struct QuestionsView: View {
                 return
             }
             
+            // Check if we're completing the open-ended section
+            if currentSection == .openEnded && !openEndedSectionCompleted {
+                showingOpenEndedConfirmation = true
+                return
+            }
+            
             currentSectionIndex += 1
             currentQuestionIndex = 0
         }
@@ -392,6 +424,11 @@ struct QuestionsView: View {
             
             // If we're going back to multiple choice section and it's completed, ensure it stays completed
             if currentSection == .multipleChoice && multipleChoiceSectionCompleted {
+                // Section is already completed, no additional action needed
+            }
+            
+            // If we're going back to open-ended section and it's completed, ensure it stays completed
+            if currentSection == .openEnded && openEndedSectionCompleted {
                 // Section is already completed, no additional action needed
             }
         }
@@ -433,6 +470,8 @@ struct QuestionsView: View {
         multipleChoiceResponses.removeAll()
         vocabularyCorrect = 0
         sessionCompleted = false
+        multipleChoiceSectionCompleted = false
+        openEndedSectionCompleted = false
         
         // Create the question session document at the start
         createQuestionSessionDocument()
@@ -515,6 +554,69 @@ struct QuestionsView: View {
         print("Multiple choice section completed. Saved \(multipleChoiceResponses.count) responses to Firestore.")
     }
     
+    // Complete open-ended section (no Firestore upload needed)
+    private func completeOpenEndedSection() {
+        guard !openEndedSectionCompleted else { return }
+        
+        // Auto-lock all unlocked open-ended answers to trigger evaluation
+        print("Auto-locking open-ended answers for section completion...")
+        var autoLockedCount = 0
+        var evaluatedCount = 0
+        
+        for question in viewModel.openEndedQuestions {
+            let questionText = question.questionText
+            if !lockedAnswers.contains(questionText) {
+                // Lock the answer if it's not already locked
+                lockedAnswers.insert(questionText)
+                autoLockedCount += 1
+                
+                // Get the current answer (either from editing or final answers)
+                let currentAnswer = openEndedAnswers[questionText] ?? editingAnswers[questionText] ?? ""
+                
+                // Only evaluate if there's an actual answer
+                if !currentAnswer.isEmpty {
+                    // Ensure the answer is saved to openEndedAnswers if it was only in editingAnswers
+                    if openEndedAnswers[questionText] == nil && editingAnswers[questionText] != nil {
+                        openEndedAnswers[questionText] = editingAnswers[questionText]
+                        print("Moved answer from editing to final for: \(questionText)")
+                    }
+                    
+                    // Evaluate the answer using LLM
+                    evaluatedCount += 1
+                    Task {
+                        let isCorrect = await evaluateWithLLM(
+                            articleContent.isEmpty ? "No article content available" : articleContent,
+                            questionText,
+                            question.answer,
+                            currentAnswer,
+                            viewModel.openEndedQuestions.firstIndex(where: { $0.questionText == questionText }) ?? 0
+                        )
+                        
+                        await MainActor.run {
+                            // Track the score for session calculation
+                            trackOpenEndedAnswer(score: isCorrect ? 1.0 : 0.0)
+                            
+                            // Debug logging
+                            print("Auto-evaluated open-ended question: \(questionText)")
+                            print("Answer: \(currentAnswer)")
+                            print("Is Correct: \(isCorrect)")
+                        }
+                    }
+                } else {
+                    print("No answer found for question: \(questionText) - skipping evaluation")
+                }
+            } else {
+                print("Question already locked: \(questionText)")
+            }
+        }
+        
+        print("Auto-locked \(autoLockedCount) answers, evaluated \(evaluatedCount) answers")
+        
+        openEndedSectionCompleted = true
+        
+        print("Open-ended section completed with auto-locked answers. Total questions: \(viewModel.openEndedQuestions.count)")
+    }
+    
     private func saveQuestionSessions() {
         guard let userId = Auth.auth().currentUser?.uid,
               let startTime = sessionStartTime,
@@ -574,6 +676,11 @@ struct QuestionsView: View {
         // Complete multiple choice section if not already completed
         if !multipleChoiceSectionCompleted && !viewModel.multipleChoiceQuestions.isEmpty {
             completeMultipleChoiceSection()
+        }
+        
+        // Complete open-ended section if not already completed
+        if !openEndedSectionCompleted && !viewModel.openEndedQuestions.isEmpty {
+            completeOpenEndedSection()
         }
         
         // Save all question sessions
